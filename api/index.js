@@ -21,6 +21,9 @@ dotenv.config();
 
 const app = express();
 
+// Necessário para que cookies "secure" funcionem atrás do proxy do Vercel/HTTPS
+app.set('trust proxy', 1);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.set('view engine', 'ejs');

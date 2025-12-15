@@ -21,6 +21,9 @@ dotenv.config();
 
 const app = express();
 
+// Permitir cookies funcionarem corretamente atrás de proxy/HTTPS em produção
+app.set('trust proxy', 1);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.set('view engine', 'ejs');
