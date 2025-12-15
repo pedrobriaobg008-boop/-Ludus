@@ -38,23 +38,27 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
 );
 
 // Configurar multer para upload de imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, join(__dirname, '../public', 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = file.originalname.split('.').pop();
-    cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
-  }
-});
+// No Vercel (serverless), usar memoryStorage ou serviço externo (S3, Cloudinary)
+const storage = process.env.NODE_ENV === 'production' 
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, join(__dirname, '../public', 'uploads'));
+      },
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = file.originalname.split('.').pop();
+        cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
+      }
+    });
 
 const fileFilter = (req, file, cb) => {
   const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -65,7 +69,11 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ storage, fileFilter });
+const upload = multer({ 
+  storage, 
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+});
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
@@ -152,25 +160,38 @@ const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) 
 
 // ==== VIEWS ====
 app.get('/', (req, res) => {
-  res.render('auth/login', { title: 'Ludus - Login' });
+  try {
+    res.render('auth/login', { title: 'Ludus - Login' });
+  } catch (err) {
+    console.error('Erro ao renderizar login:', err);
+    res.status(500).send('Erro ao carregar página');
+  }
 });
 
 // Login/Logout
 app.post('/login', async (req, res) => {
   try {
+    console.log('Tentativa de login:', req.body.email || req.body.username);
     const email = (req.body.email || req.body.username || '').toLowerCase();
     const senha = req.body.password || req.body.senha;
+    
     if (!email || !senha) {
+      console.log('Login falhou: campos vazios');
       return res.status(400).render('auth/login', { title: 'Ludus - Login', error: 'Informe e-mail e senha.' });
     }
+    
     const user = await Usuario.findOne({ email_usuario: email });
     if (!user) {
+      console.log('Login falhou: usuário não encontrado');
       return res.status(401).render('auth/login', { title: 'Ludus - Login', error: 'Credenciais inválidas.' });
     }
+    
     const ok = await bcrypt.compare(senha, user.senha_hash);
     if (!ok) {
+      console.log('Login falhou: senha incorreta');
       return res.status(401).render('auth/login', { title: 'Ludus - Login', error: 'Credenciais inválidas.' });
     }
+    
     req.session.user = {
       id: user._id.toString(),
       nome_usuario: user.nome_usuario,
@@ -178,10 +199,12 @@ app.post('/login', async (req, res) => {
       instituicao_usuario: user.instituicao_usuario,
       perfil: user.perfil || [],
     };
+    
+    console.log('Login bem-sucedido:', email);
     return res.redirect('/ocorrencias');
   } catch (err) {
-    console.error(err);
-    return res.status(500).render('auth/login', { title: 'Ludus - Login', error: 'Erro no servidor.' });
+    console.error('Erro no login:', err);
+    return res.status(500).render('auth/login', { title: 'Ludus - Login', error: 'Erro no servidor: ' + err.message });
   }
 });
 
