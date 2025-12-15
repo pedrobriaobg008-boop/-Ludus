@@ -1,11 +1,17 @@
 import express from 'express';
-import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'express-session';
-import { fileURLToPath } from 'url';
+
+// Caminho correto das views e public
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Models
 import Usuario from './models/Usuario.js';
 import Jogo from './models/Jogo.js';
 import Turma from './models/Turma.js';
@@ -13,13 +19,62 @@ import Jogador from './models/Jogador.js';
 
 dotenv.config();
 
-// Log runtime errors to diagnose crashes
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason);
+const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.set('view engine', 'ejs');
+
+// Servir arquivos estáticos
+app.use(express.static(join(__dirname, 'public')));
+app.set('views', join(__dirname, 'views'));
+
+// Sessões para autenticação
+app.use(
+  session({
+    name: 'sid',
+    secret: process.env.SESSION_SECRET || 'dev-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+// Configurar multer para upload de imagens
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, join(__dirname, 'public', 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = file.originalname.split('.').pop();
+    cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
+  }
 });
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas imagens são permitidas'), false);
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+// Conectar ao MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
+mongoose.connect(MONGO_URI, { 
+  useNewUrlParser: true, 
+  useUnifiedTopology: true 
+})
+.then(() => console.log('MongoDB conectado'))
+.catch(err => console.error('Erro ao conectar MongoDB:', err));
 
 // Garantir admin existente
 async function ensureAdmin() {
@@ -46,63 +101,7 @@ async function ensureAdmin() {
     console.error('Falha ao garantir admin:', e);
   }
 }
-
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(async () => {
-    console.log('MongoDB conectado');
-    await ensureAdmin();
-  })
-  .catch(err => console.error('Erro ao conectar MongoDB:', err));
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-
-// Sessões para autenticação
-app.use(
-  session({
-    name: 'sid',
-    secret: process.env.SESSION_SECRET || 'dev-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
-  })
-);
-
-// Configurar multer para upload de imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'public', 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'jogo-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Apenas imagens são permitidas'), false);
-  }
-};
-
-const upload = multer({ storage, fileFilter });
-
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // <- para APIs
+ensureAdmin();
 
 // Helper para checar se é admin (aceita string ou array, e variações)
 const isAdminPerfil = (perfil) => {
