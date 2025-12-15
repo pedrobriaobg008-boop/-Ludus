@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
 import dotenv from 'dotenv';
-import session from 'express-session';
+import session from 'cookie-session';
 
 // Caminho correto das views e public
 const __filename = fileURLToPath(import.meta.url);
@@ -32,19 +32,15 @@ app.set('view engine', 'ejs');
 app.use(express.static(join(__dirname, '../public')));
 app.set('views', join(__dirname, '../views'));
 
-// Sessões para autenticação
+// Sessões baseadas em cookie (compatível com serverless)
 app.use(
   session({
     name: 'sid',
-    secret: process.env.SESSION_SECRET || 'dev-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
+    keys: [process.env.SESSION_SECRET || 'dev-secret'],
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   })
 );
 
@@ -247,9 +243,8 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy(() => {
-    res.redirect('/');
-  });
+  req.session = null;
+  res.redirect('/');
 });
 
 app.get('/ocorrencias', requireAuthView, (req, res) => {
