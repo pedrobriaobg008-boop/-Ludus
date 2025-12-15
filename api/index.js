@@ -50,27 +50,39 @@ async function ensureAdmin() {
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
 
 // Variável para controlar se o MongoDB já foi inicializado
-let isMongoConnected = false;
+let mongoPromise = null;
 
 // Função para garantir conexão MongoDB (importante para serverless)
 async function connectMongo() {
-  if (isMongoConnected && mongoose.connection.readyState === 1) {
+  // Se já existe uma conexão ativa, retorna imediatamente
+  if (mongoose.connection.readyState === 1) {
     return;
   }
   
-  try {
-    await mongoose.connect(MONGO_URI, { 
-      useNewUrlParser: true, 
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000
-    });
-    console.log('MongoDB conectado');
-    isMongoConnected = true;
-    await ensureAdmin();
-  } catch (err) {
-    console.error('Erro ao conectar MongoDB:', err);
-    throw err;
+  // Se já está conectando, aguarda a promise existente
+  if (mongoPromise) {
+    return mongoPromise;
   }
+  
+  // Inicia nova conexão
+  mongoPromise = mongoose.connect(MONGO_URI, { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  })
+  .then(async () => {
+    console.log('MongoDB conectado');
+    await ensureAdmin();
+    mongoPromise = null; // Limpa a promise após conectar
+  })
+  .catch(err => {
+    console.error('Erro ao conectar MongoDB:', err);
+    mongoPromise = null; // Limpa em caso de erro
+    throw err;
+  });
+  
+  return mongoPromise;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -135,17 +147,6 @@ const isAdminPerfil = (perfil) => {
   return false;
 };
 
-// Middleware para garantir conexão MongoDB antes de processar requisições
-app.use(async (req, res, next) => {
-  try {
-    await connectMongo();
-    next();
-  } catch (err) {
-    console.error('Erro na conexão MongoDB:', err);
-    res.status(503).json({ error: 'Serviço temporariamente indisponível' });
-  }
-});
-
 // Expor usuário atual às views
 app.use((req, res, next) => {
   const user = req.session?.user || null;
@@ -166,14 +167,33 @@ const requireAuthApi = (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-  const user = req.session?.user;
-  if (!user || !isAdminPerfil(user.perfil)) {
-    return req.originalUrl.startsWith('/api')
-      ? res.status(403).json({ error: 'Acesso negado' })
-      : res.redirect('/');
+  const user = req.sessiasync (req, res, next) => {
+  try {
+    await connectMongo();
+    if (!req.session?.user) return res.redirect('/');
+    next();
+  } catch (err) {
+    console.error('Erro DB:', err);
+    res.status(503).send('Serviço temporariamente indisponível');
   }
-  next();
 };
+
+const requireAuthApi = async (req, res, next) => {
+  try {
+    await conasync (req, res) => {
+  try {
+    await connectMongo();
+    res.render('auth/login', { title: 'Ludus - Login' });
+  } catch (err) {
+    console.error('Erro DB:', err);
+    res.status(503).send('Serviço temporariamente indisponível');
+  }
+});
+
+// Login/Logout
+app.post('/login', async (req, res) => {
+  try {
+    await connectMongo();
 
 const getUserId = (req) => req.session?.user?.id;
 const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) === String(userId);
@@ -248,6 +268,7 @@ app.get('/addcenaok', requireAuthView, (req, res) => {
 });
 app.get('/usuario', requireAuthView, async (req, res) => {
   try {
+    await connectMongo();
     const self = await Usuario.findById(req.session.user.id);
     if (isAdminPerfil(req.session?.user?.perfil)) {
       return res.render('admin/usuario/usuario', { title: 'Usuários da Instituição', currentUser: self });
@@ -542,12 +563,7 @@ app.put('/api/jogadores/:id', async (req, res) => {
     res.status(500).json({ error: err.message || 'Erro ao atualizar jogador' });
   }
 });
-
-app.delete('/api/jogadores/:id', async (req, res) => {
-  const userId = getUserId(req);
-  const isAdmin = isAdminPerfil(req.session?.user?.perfil);
-  const jogador = await Jogador.findById(req.params.id).populate('turma');
-  if (!jogador) return notFound(res);
+pp if (!jogador) return notFound(res);
   if (!isAdmin && !isOwner(jogador.turma?.createdBy, userId)) return res.status(403).json({ error: 'Acesso negado' });
   await jogador.deleteOne();
   res.json({ ok: true });
