@@ -74,8 +74,12 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
 });
 
-// Conectar ao MongoDB
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
+// Conectar ao MongoDB (garante DB "ludus" se não vier no URI)
+const rawMongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
+const MONGO_URI = rawMongoUri.match(/\/[^/?]+(\?|$)/) ? rawMongoUri : `${rawMongoUri.replace(/\/$/, '')}/ludus`;
+if (!rawMongoUri.match(/\/[^/?]+(\?|$)/)) {
+  console.warn('⚠️ MONGO_URI sem nome de database; usando /ludus automaticamente');
+}
 
 // Validar MONGO_URI em produção
 if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
