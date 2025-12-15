@@ -205,9 +205,9 @@ app.get('/', (req, res) => {
 app.post('/login', async (req, res) => {
   try {
     await connectDB();
-    console.log('Tentativa de login:', req.body.email || req.body.username);
     const email = (req.body.email || req.body.username || '').toLowerCase();
     const senha = req.body.password || req.body.senha;
+    console.log('Tentativa de login:', email);
     
     if (!email || !senha) {
       console.log('Login falhou: campos vazios');
@@ -215,14 +215,14 @@ app.post('/login', async (req, res) => {
     }
     
     const user = await Usuario.findOne({ email_usuario: email });
+    console.log('Login busca usuário:', user ? { id: user._id.toString(), email: user.email_usuario, perfil: user.perfil } : 'não encontrado');
     if (!user) {
-      console.log('Login falhou: usuário não encontrado');
       return res.status(401).render('auth/login', { title: 'Ludus - Login', error: 'Credenciais inválidas.' });
     }
     
     const ok = await bcrypt.compare(senha, user.senha_hash);
+    console.log('Resultado comparação senha:', ok);
     if (!ok) {
-      console.log('Login falhou: senha incorreta');
       return res.status(401).render('auth/login', { title: 'Ludus - Login', error: 'Credenciais inválidas.' });
     }
     
@@ -310,7 +310,7 @@ app.get('/jogadores', (req, res) => {
 const notFound = (res, msg = 'Não encontrado') => res.status(404).json({ error: msg });
 const badRequest = (res, msg) => res.status(400).json({ error: msg });
 
-// Seed Admin (proteção por token)
+// Seed Admin (proteção por token) - também atualiza senha se já existir
 app.post('/seed-admin', async (req, res) => {
   try {
     await connectDB();
@@ -323,10 +323,17 @@ app.post('/seed-admin', async (req, res) => {
     const senha = req.body.senha || 'admin123';
     const instituicao = req.body.instituicao || 'Ludus';
 
-    const exists = await Usuario.findOne({ email_usuario: email });
-    if (exists) return res.json({ ok: true, message: 'Admin já existe', userId: exists._id });
-
     const hash = await bcrypt.hash(senha, 10);
+    const exists = await Usuario.findOne({ email_usuario: email });
+    if (exists) {
+      exists.nome_usuario = nome;
+      exists.instituicao_usuario = instituicao;
+      exists.senha_hash = hash;
+      exists.perfil = ['Administrador'];
+      await exists.save();
+      return res.json({ ok: true, message: 'Admin atualizado', userId: exists._id });
+    }
+
     const novo = await Usuario.create({
       nome_usuario: nome,
       email_usuario: email,
@@ -337,7 +344,7 @@ app.post('/seed-admin', async (req, res) => {
     res.status(201).json({ ok: true, userId: novo._id, email });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erro ao criar admin' });
+    res.status(500).json({ error: 'Erro ao criar/atualizar admin' });
   }
 });
 
