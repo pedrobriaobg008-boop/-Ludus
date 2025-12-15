@@ -69,16 +69,37 @@ const upload = multer({ storage, fileFilter });
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-mongoose.connect(MONGO_URI, { 
-  useNewUrlParser: true, 
-  useUnifiedTopology: true 
-})
-.then(() => console.log('MongoDB conectado'))
-.catch(err => console.error('Erro ao conectar MongoDB:', err));
+
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected && mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  try {
+    await mongoose.connect(MONGO_URI, { 
+      useNewUrlParser: true, 
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    isConnected = true;
+    console.log('MongoDB conectado');
+  } catch (err) {
+    console.error('Erro ao conectar MongoDB:', err);
+    isConnected = false;
+    throw err;
+  }
+};
+
+// Chamar conexão inicial
+connectDB();
 
 // Garantir admin existente
 async function ensureAdmin() {
   try {
+    await connectDB();
     const adminEmail = (process.env.ADMIN_EMAIL || 'admin@ludus.local').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const adminNome = process.env.ADMIN_NAME || 'Administrador';

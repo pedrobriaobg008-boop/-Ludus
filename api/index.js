@@ -191,8 +191,8 @@ app.get('/', (req, res) => {
 
 // Login/Logout
 app.post('/login', async (req, res) => {
-  trawait connectDB();
-    y {
+  try {
+    await connectDB();
     console.log('Tentativa de login:', req.body.email || req.body.username);
     const email = (req.body.email || req.body.username || '').toLowerCase();
     const senha = req.body.password || req.body.senha;
@@ -273,8 +273,8 @@ app.get('/addcenaok', requireAuthView, (req, res) => {
 });
 
 app.get('/usuario', requireAuthView, async (req, res) => {
-  trawait connectDB();
-    y {
+  try {
+    await connectDB();
     const self = await Usuario.findById(req.session.user.id);
     if (isAdminPerfil(req.session?.user?.perfil)) {
       return res.render('admin/usuario/usuario', { title: 'Usuários da Instituição', currentUser: self });
@@ -300,9 +300,9 @@ const notFound = (res, msg = 'Não encontrado') => res.status(404).json({ error:
 const badRequest = (res, msg) => res.status(400).json({ error: msg });
 
 // Seed Admin (proteção por token)
-app.await connectDB();
-    post('/seed-admin', async (req, res) => {
+app.post('/seed-admin', async (req, res) => {
   try {
+    await connectDB();
     const token = req.body.token || req.query.token;
     const expected = process.env.ADMIN_SEED_TOKEN || 'seed-admin-dev';
     if (token !== expected) return res.status(403).json({ error: 'Token inválido' });
