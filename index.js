@@ -67,12 +67,8 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter });
 
-// Conectar ao MongoDB (garante DB "ludus" se não vier no URI)
-const rawMongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-const MONGO_URI = rawMongoUri.match(/\/[^/?]+(\?|$)/) ? rawMongoUri : `${rawMongoUri.replace(/\/$/, '')}/ludus`;
-if (!rawMongoUri.match(/\/[^/?]+(\?|$)/)) {
-  console.warn('⚠️ MONGO_URI sem nome de database; usando /ludus automaticamente');
-}
+// Conectar ao MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
 
 let isConnected = false;
 
@@ -88,6 +84,7 @@ const connectDB = async () => {
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      dbName: 'ludus'
     });
     isConnected = true;
     const dbName = mongoose.connection.name;
