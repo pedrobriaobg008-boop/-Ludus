@@ -77,16 +77,37 @@ const upload = multer({
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-mongoose.connect(MONGO_URI, { 
-  useNewUrlParser: true, 
-  useUnifiedTopology: true 
-})
-.then(() => console.log('MongoDB conectado'))
-.catch(err => console.error('Erro ao conectar MongoDB:', err));
+
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected && mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  try {
+    await mongoose.connect(MONGO_URI, { 
+      useNewUrlParser: true, 
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    isConnected = true;
+    console.log('MongoDB conectado');
+  } catch (err) {
+    console.error('Erro ao conectar MongoDB:', err);
+    isConnected = false;
+    throw err;
+  }
+};
+
+// Chamar conexão inicial
+connectDB();
 
 // Garantir admin existente
 async function ensureAdmin() {
   try {
+    await connectDB();
     const adminEmail = (process.env.ADMIN_EMAIL || 'admin@ludus.local').toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const adminNome = process.env.ADMIN_NAME || 'Administrador';
@@ -170,7 +191,8 @@ app.get('/', (req, res) => {
 
 // Login/Logout
 app.post('/login', async (req, res) => {
-  try {
+  trawait connectDB();
+    y {
     console.log('Tentativa de login:', req.body.email || req.body.username);
     const email = (req.body.email || req.body.username || '').toLowerCase();
     const senha = req.body.password || req.body.senha;
@@ -251,7 +273,8 @@ app.get('/addcenaok', requireAuthView, (req, res) => {
 });
 
 app.get('/usuario', requireAuthView, async (req, res) => {
-  try {
+  trawait connectDB();
+    y {
     const self = await Usuario.findById(req.session.user.id);
     if (isAdminPerfil(req.session?.user?.perfil)) {
       return res.render('admin/usuario/usuario', { title: 'Usuários da Instituição', currentUser: self });
@@ -277,7 +300,8 @@ const notFound = (res, msg = 'Não encontrado') => res.status(404).json({ error:
 const badRequest = (res, msg) => res.status(400).json({ error: msg });
 
 // Seed Admin (proteção por token)
-app.post('/seed-admin', async (req, res) => {
+app.await connectDB();
+    post('/seed-admin', async (req, res) => {
   try {
     const token = req.body.token || req.query.token;
     const expected = process.env.ADMIN_SEED_TOKEN || 'seed-admin-dev';
@@ -308,6 +332,17 @@ app.post('/seed-admin', async (req, res) => {
 
 // Proteger todas as APIs: requer login
 app.use('/api', requireAuthApi);
+
+// Middleware para garantir conexão DB em todas as rotas /api
+app.use('/api', async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Erro ao conectar DB:', err);
+    res.status(503).json({ error: 'Serviço indisponível' });
+  }
+});
 
 // ---- Usuários perfil instituição (admin) ----
 app.post('/api/usuarios-instituicao', requireAdmin, async (req, res) => {
