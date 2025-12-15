@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turmas e Jogadores - Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .page-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+        .page-desc { color: #64748b; font-size: 13px; margin-top: 4px; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+        .field label { display: block; font-size: 14px; color: #475569; margin-bottom: 6px; font-weight: 600; }
+        .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 14px; }
+        .actions { display: flex; gap: 8px; }
+        .btn { border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-ghost { background: #f1f5f9; color: #0f172a; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-sm { padding: 6px 10px; font-size: 12px; }
+        .btn:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { color: #475569; font-weight: 700; font-size: 14px; background: #f8fafc; }
+        td { color: #0f172a; font-size: 14px; vertical-align: middle; }
+        .alert { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; }
+        .alert.success { background: #ecfdf3; color: #15803d; border: 1px solid #bbf7d0; }
+        .alert.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecdd3; }
+        .search-box { margin: -4px 0 10px 0; }
+        .search-box input { width: 240px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 14px; }
+        .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
+        .section-title h3 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+        .turma-row { background: #f8fafc; }
+        .turma-row td { font-weight: 600; }
+        .tab-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tab-btn { padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #0f172a; cursor: pointer; font-weight: 600; }
+        .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+        @media (max-width: 640px) {
+            .actions { flex-direction: column; }
+            .page-head { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <div class="page-head">
+            <div>
+                <h1>📚 Turmas e Jogadores</h1>
+                <p class="page-desc">Gerencie turmas e adicione jogadores diretamente.</p>
+            </div>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- Abas -->
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('turmas')">Turmas</button>
+            <button class="tab-btn" onclick="switchTab('jogadores')">Jogadores</button>
+        </div>
+
+        <!-- SEÇÃO TURMAS -->
+        <section class="card form-section active" id="turmasForm">
+            <form id="turmaForm">
+                <input type="hidden" id="turmaId">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Nome da Turma *</label>
+                        <input type="text" id="nome_turma" required placeholder="Ex: Turma A - 2025" autofocus>
+                    </div>
+                    <% if (isAdmin) { %>
+                    <div class="field">
+                        <label>Criador (Usuário) *</label>
+                        <select id="createdBy" required>
+                            <option value="">-- Selecione um usuário --</option>
+                        </select>
+                    </div>
+                    <% } else { %>
+                        <input type="hidden" id="createdBy" value="<%= (currentUser && (currentUser.id || currentUser._id)) || '' %>">
+                    <% } %>
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button type="submit" class="btn btn-primary" id="submitLabelTurma">Salvar Turma</button>
+                    <button type="button" class="btn btn-ghost" id="cancelEditTurma" style="display: none;">Cancelar</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- SEÇÃO JOGADORES -->
+        <section class="card form-section" id="jogadoresForm">
+            <form id="jogadorForm">
+                <input type="hidden" id="jogadorId">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Turma *</label>
+                        <select id="turmaSelect" required>
+                            <option value="">-- Selecione uma turma --</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Nome do Jogador *</label>
+                        <input type="text" id="nome_jogador" required placeholder="Ex: João Silva" autofocus>
+                    </div>
+                    <div class="field">
+                        <label>Login *</label>
+                        <input type="text" id="login" required placeholder="Ex: joao.silva" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label>Senha *</label>
+                        <input type="password" id="senha" required placeholder="Digite uma senha" autocomplete="off">
+                    </div>
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button type="submit" class="btn btn-primary" id="submitLabelJogador">Adicionar Jogador</button>
+                    <button type="button" class="btn btn-ghost" id="cancelEditJogador" style="display: none;">Cancelar edição</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- TURMAS E SEUS JOGADORES -->
+        <section class="card">
+            <div class="section-title">
+                <h3>Turmas e Jogadores</h3>
+                <div class="search-box">
+                    <input type="text" id="filtro" placeholder="Filtrar por nome..." oninput="renderTurmasComJogadores()">
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Turma / Jogador</th>
+                        <th>Login</th>
+                        <th>Data de Criação</th>
+                        <th style="width: 200px;">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabelaBody">
+                    <tr><td colspan="4" style="color: #94a3b8; text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const apiTurmas = '/api/turmas';
+    const apiJogadores = '/api/jogadores';
+    const apiUsuarios = '/api/usuarios-instituicao';
+    const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
+    const currentUserId = '<%= (currentUser && (currentUser.id || currentUser._id)) || '' %>';
+
+    const alertBox = document.getElementById('alert');
+    const turmaForm = document.getElementById('turmaForm');
+    const jogadorForm = document.getElementById('jogadorForm');
+    const tabelaBody = document.getElementById('tabelaBody');
+    const filtro = document.getElementById('filtro');
+
+    let turmas = [];
+    let jogadores = [];
+    let usuarios = {};
+
+    function showMessage(type, msg) {
+        alertBox.textContent = msg;
+        alertBox.className = 'alert ' + type;
+        alertBox.style.display = 'block';
+        setTimeout(() => { alertBox.style.display = 'none'; }, 3000);
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        if (tab === 'turmas') {
+            document.getElementById('turmasForm').classList.add('active');
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            resetTurmaForm();
+        } else {
+            document.getElementById('jogadoresForm').classList.add('active');
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            resetJogadorForm();
+        }
+    }
+
+    function resetTurmaForm() {
+        turmaForm.reset();
+        document.getElementById('turmaId').value = '';
+        document.getElementById('submitLabelTurma').textContent = 'Salvar Turma';
+        document.getElementById('cancelEditTurma').style.display = 'none';
+        const createdBySelect = document.getElementById('createdBy');
+        if (!isAdmin && createdBySelect) createdBySelect.value = currentUserId;
+    }
+
+    function resetJogadorForm() {
+        jogadorForm.reset();
+        document.getElementById('jogadorId').value = '';
+        document.getElementById('submitLabelJogador').textContent = 'Adicionar Jogador';
+        document.getElementById('cancelEditJogador').style.display = 'none';
+    }
+
+    async function fetchUsuarios() {
+        if (!isAdmin) return;
+        try {
+            const res = await fetch(apiUsuarios, { credentials: 'same-origin' });
+            const data = await res.json();
+            usuarios = {};
+            (data || []).forEach(u => { usuarios[u._id] = u.nome_usuario; });
+            
+            const createdBySelect = document.getElementById('createdBy');
+            if (!createdBySelect) return;
+            createdBySelect.innerHTML = '<option value="">-- Selecione um usuário --</option>';
+            Object.entries(usuarios).forEach(([id, nome]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = nome;
+                createdBySelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Erro ao carregar usuários:', err);
+        }
+    }
+
+    async function fetchTurmas() {
+        try {
+            const res = await fetch(apiTurmas, { credentials: 'same-origin' });
+            turmas = await res.json() || [];
+            
+            const turmaSelect = document.getElementById('turmaSelect');
+            turmaSelect.innerHTML = '<option value="">-- Selecione uma turma --</option>';
+            (turmas || []).forEach(t => {
+                const option = document.createElement('option');
+                option.value = t._id;
+                option.textContent = t.nome_turma;
+                turmaSelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Erro ao carregar turmas:', err);
+        }
+    }
+
+    async function fetchJogadores() {
+        try {
+            const res = await fetch(apiJogadores, { credentials: 'same-origin' });
+            jogadores = await res.json() || [];
+            renderTurmasComJogadores();
+        } catch (err) {
+            console.error('Erro ao carregar jogadores:', err);
+            showMessage('error', 'Erro ao carregar dados');
+        }
+    }
+
+    function renderTurmasComJogadores() {
+        const term = (filtro.value || '').toLowerCase().trim();
+        
+        let html = '';
+        turmas.forEach(turma => {
+            const jogadoresDaTurma = jogadores.filter(j => 
+                (j.turma && (j.turma._id === turma._id || j.turma === turma._id))
+            );
+            
+            const turmaMatch = !term || turma.nome_turma.toLowerCase().includes(term);
+            const jogadoresMatch = !term || jogadoresDaTurma.some(j => 
+                (j.nome_jogador || '').toLowerCase().includes(term) ||
+                (j.login || '').toLowerCase().includes(term)
+            );
+
+            if (!turmaMatch && !jogadoresMatch) return;
+
+            // Linha da turma
+            html += `
+                <tr class="turma-row">
+                    <td><strong>📚 ${turma.nome_turma}</strong></td>
+                    <td>—</td>
+                    <td>${new Date(turma.createdAt).toLocaleDateString('pt-BR')}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn btn-ghost btn-sm" onclick='editarTurma(${JSON.stringify(turma)})'>Editar</button>
+                            <button class="btn btn-danger btn-sm" onclick="removerTurma('${turma._id}')">Remover</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            // Linhas dos jogadores
+            if (jogadoresDaTurma.length > 0) {
+                jogadoresDaTurma.forEach(j => {
+                    if (term && !(j.nome_jogador.toLowerCase().includes(term) || (j.login || '').toLowerCase().includes(term))) return;
+                    
+                    html += `
+                        <tr>
+                            <td style="padding-left:40px;">👤 ${j.nome_jogador || '-'}</td>
+                            <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">${j.login || '—'}</code></td>
+                            <td>${j.createdAt ? new Date(j.createdAt).toLocaleDateString('pt-BR') : '—'}</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn btn-ghost btn-sm" onclick='editarJogador(${JSON.stringify(j)})'>Editar</button>
+                                    <button class="btn btn-danger btn-sm" onclick="removerJogador('${j._id}')">Remover</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                if (!term) {
+                    html += `<tr><td colspan="4" style="padding-left:40px; color:#94a3b8;">Nenhum jogador nesta turma</td></tr>`;
+                }
+            }
+        });
+
+        if (!html) {
+            html = '<tr><td colspan="4" style="color: #94a3b8; text-align: center;">Nenhuma turma ou jogador encontrado.</td></tr>';
+        }
+
+        tabelaBody.innerHTML = html;
+    }
+
+    window.editarTurma = (t) => {
+        switchTab('turmas');
+        document.getElementById('turmaId').value = t._id;
+        document.getElementById('nome_turma').value = t.nome_turma || '';
+        const createdBySelect = document.getElementById('createdBy');
+        if (createdBySelect) createdBySelect.value = (t.createdBy && (t.createdBy._id || t.createdBy)) || currentUserId;
+        document.getElementById('submitLabelTurma').textContent = 'Atualizar Turma';
+        document.getElementById('cancelEditTurma').style.display = 'inline-flex';
+        document.getElementById('nome_turma').focus();
+    };
+
+    window.editarJogador = (j) => {
+        switchTab('jogadores');
+        document.getElementById('jogadorId').value = j._id;
+        document.getElementById('turmaSelect').value = (j.turma && j.turma._id) || '';
+        document.getElementById('nome_jogador').value = j.nome_jogador || '';
+        document.getElementById('login').value = j.login || '';
+        document.getElementById('senha').value = '';
+        document.getElementById('submitLabelJogador').textContent = 'Atualizar Jogador';
+        document.getElementById('cancelEditJogador').style.display = 'inline-flex';
+        document.getElementById('nome_jogador').focus();
+    };
+
+    document.getElementById('cancelEditTurma').addEventListener('click', resetTurmaForm);
+    document.getElementById('cancelEditJogador').addEventListener('click', resetJogadorForm);
+
+    // SUBMIT TURMA
+    turmaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            nome_turma: document.getElementById('nome_turma').value.trim(),
+            createdBy: document.getElementById('createdBy').value
+        };
+
+        if (!payload.nome_turma || !payload.createdBy) {
+            showMessage('error', 'Preencha todos os campos.');
+            return;
+        }
+
+        const isEdit = !!document.getElementById('turmaId').value;
+        try {
+            const res = await fetch(isEdit ? `${apiTurmas}/${document.getElementById('turmaId').value}` : apiTurmas, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+            showMessage('success', isEdit ? 'Turma atualizada' : 'Turma criada');
+            resetTurmaForm();
+            await fetchTurmas();
+            await fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    });
+
+    // SUBMIT JOGADOR
+    jogadorForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            nome_jogador: document.getElementById('nome_jogador').value.trim(),
+            turma: document.getElementById('turmaSelect').value,
+            login: document.getElementById('login').value.trim(),
+            senha: document.getElementById('senha').value.trim()
+        };
+        const isEdit = !!document.getElementById('jogadorId').value;
+
+        if (!payload.nome_jogador || !payload.turma || !payload.login || !payload.senha) {
+            showMessage('error', 'Preencha todos os campos obrigatórios.');
+            return;
+        }
+
+        try {
+            const endpoint = isEdit ? `${apiJogadores}/${document.getElementById('jogadorId').value}` : apiJogadores;
+            const res = await fetch(endpoint, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+            showMessage('success', isEdit ? 'Jogador atualizado' : 'Jogador criado');
+            resetJogadorForm();
+            await fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    });
+
+    window.removerTurma = async (id) => {
+        if (!confirm('Remover esta turma?')) return;
+        try {
+            const res = await fetch(`${apiTurmas}/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Erro ao remover');
+            showMessage('success', 'Turma removida');
+            await fetchTurmas();
+            await fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    window.removerJogador = async (id) => {
+        if (!confirm('Remover este jogador?')) return;
+        try {
+            const res = await fetch(`${apiJogadores}/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Erro ao remover');
+            showMessage('success', 'Jogador removido');
+            await fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    async function init() {
+        await fetchUsuarios();
+        await fetchTurmas();
+        await fetchJogadores();
+    }
+
+    init();
+</script>
+</body>
+</html>

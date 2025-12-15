@@ -1,0 +1,127 @@
+body {
+    background: linear-gradient(120deg, #eaf0fe 0%, #f5f6fa 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-wrapper,
+.register-wrapper {
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(37,99,235,0.10);
+    width: 100%;
+    max-width: 420px;
+    padding: 48px 36px 36px 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.login-form,
+.register-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.login-form .form-group label,
+.register-form .form-group label {
+    font-size: 15px;
+    color: #2563eb;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.login-form .form-group input,
+.register-form .form-group input {
+    padding: 13px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: border-color 0.2s;
+    background: #f7faff;
+}
+
+.login-form .form-group input:focus,
+.register-form .form-group input:focus {
+    border-color: #2563eb;
+    outline: none;
+    background: #eaf0fe;
+}
+
+.login-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+
+.register-link,
+.back-link {
+    font-size: 15px;
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.register-link:hover,
+.back-link:hover {
+    color: #1746a2;
+    text-decoration: underline;
+}
+
+.profile-options {
+    display: flex;
+    gap: 18px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.profile-options label {
+    font-size: 15px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.btn-login,
+.btn-register {
+    padding: 14px;
+    width: 100%;
+    background: linear-gradient(90deg, #2563eb 60%, #1746a2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px #2563eb22;
+    transition: background 0.2s, box-shadow 0.2s;
+    margin-top: 10px;
+}
+
+.btn-login:hover,
+.btn-register:hover {
+    background: linear-gradient(90deg, #1746a2 60%, #2563eb 100%);
+    box-shadow: 0 4px 16px #2563eb33;
+}
+
+.error-message {
+    color: #e53e3e;
+    font-size: 14px;
+    margin-bottom: 10px;
+    text-align: center;
+    background: #ffeaea;
+    border-radius: 6px;
+    padding: 6px 0;
+}

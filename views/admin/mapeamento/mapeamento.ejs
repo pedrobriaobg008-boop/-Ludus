@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeamento de Jogos</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .page-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:18px; box-shadow:0 8px 24px rgba(15,23,42,0.08); margin-bottom:16px; }
+        .grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+        .field label { display:block; font-size:14px; color:#475569; margin-bottom:6px; }
+        .field input, .field textarea { width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; font-size:14px; }
+        .field textarea { min-height:92px; resize:vertical; }
+        .actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .btn { border:none; border-radius:8px; padding:10px 14px; cursor:pointer; font-weight:600; }
+        .btn-primary { background:#2563eb; color:#fff; }
+        .btn-ghost { background:#f1f5f9; color:#0f172a; }
+        .btn-danger { background:#dc2626; color:#fff; }
+        table { width:100%; border-collapse:collapse; }
+        th, td { padding:12px 10px; border-bottom:1px solid #e5e7eb; text-align:left; }
+        th { color:#475569; font-weight:700; font-size:14px; }
+        td { color:#0f172a; font-size:14px; vertical-align:top; }
+        .alert { margin-bottom:12px; padding:10px 12px; border-radius:10px; font-size:14px; display:none; }
+        .alert.success { background:#ecfdf3; color:#15803d; border:1px solid #bbf7d0; }
+        .alert.error { background:#fef2f2; color:#b91c1c; border:1px solid #fecdd3; }
+        .search { margin: -4px 0 10px 0; }
+        .search input { width:240px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+        @media (max-width:640px){ .actions{flex-direction:column;} th:nth-child(6),td:nth-child(6){display:none;} }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <div class="page-head">
+            <div>
+                <h1>🎮 Mapeamento de Jogos</h1>
+                <% if (isAdmin) { %>
+                <p style="color:#64748b;margin-top:4px;">Cadastre, edite e acompanhe os jogos.</p>
+                <% } %>
+            </div>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <% if (isAdmin) { %>
+        <section class="card">
+            <form id="jogoForm">
+                <input type="hidden" id="jogoId">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Nome do Jogo *</label>
+                        <input type="text" id="nome" required placeholder="Ex: Matemática Aventura">
+                    </div>
+                    <div class="field">
+                        <label>Identificação na Unity *</label>
+                        <input type="text" id="identificacao_unity" required placeholder="ID interno do build">
+                    </div>
+                    <div class="field">
+                        <label>Breve descrição *</label>
+                        <textarea id="descricao" required placeholder="Resumo curto do jogo"></textarea>
+                    </div>
+                    <div class="field">
+                        <label>Link para jogar</label>
+                        <input type="url" id="link_jogar" placeholder="https://...">
+                    </div>
+                    <div class="field">
+                        <label>Ícone do jogo (imagem)</label>
+                        <input type="file" id="icone" accept="image/*">
+                        <div id="iconPreview" style="margin-top:8px; display:none;">
+                            <p style="font-size:12px; color:#64748b; margin:0 0 6px 0;">Imagem atual:</p>
+                            <img id="iconPreviewImg" src="" alt="ícone" style="width:64px; height:64px; border-radius:8px; object-fit:cover;">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Total de níveis</label>
+                        <input type="number" min="0" id="total_niveis" placeholder="Ex: 12">
+                    </div>
+                    <div class="field">
+                        <label>XP máxima</label>
+                        <input type="number" min="0" id="xp_maxima" placeholder="Ex: 5000">
+                    </div>
+                </div>
+                <div class="actions" style="margin-top:12px;">
+                    <button type="submit" class="btn btn-primary" id="submitLabel">Salvar</button>
+                    <button type="button" class="btn btn-ghost" id="cancelEdit" style="display:none;">Cancelar edição</button>
+                </div>
+            </form>
+        </section>
+        <% } %>
+
+        <section class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+                <h3 style="margin:0;">Jogos cadastrados</h3>
+                <div class="search">
+                    <input type="text" id="filtro" placeholder="Filtrar por nome..." oninput="renderJogos()">
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Descrição</th>
+                        <th>Unity ID</th>
+                        <th>Link</th>
+                        <th>Ícone</th>
+                        <th>Níveis / XP</th>
+                        <% if (isAdmin) { %><th style="width:160px;">Ações</th><% } %>
+                    </tr>
+                    </thead>
+                    <tbody id="jogosBody">
+                    <tr><td colspan="<%= isAdmin ? 7 : 6 %>" style="color:#94a3b8;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const apiBase = '/api/jogos';
+    const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
+    const colSpan = isAdmin ? 7 : 6;
+    const form = document.getElementById('jogoForm');
+    const alertBox = document.getElementById('alert');
+    const tbody = document.getElementById('jogosBody');
+    const filtro = document.getElementById('filtro');
+    const cancelEditBtn = document.getElementById('cancelEdit');
+    const submitLabel = document.getElementById('submitLabel');
+    const jogoIdInput = document.getElementById('jogoId');
+
+    let jogos = [];
+
+    function showMessage(type, msg) {
+        alertBox.textContent = msg;
+        alertBox.className = 'alert ' + type;
+        alertBox.style.display = 'block';
+        setTimeout(() => { alertBox.style.display = 'none'; }, 3000);
+    }
+
+    function resetForm() {
+        if (!form) return;
+        form.reset();
+        jogoIdInput.value = '';
+        submitLabel.textContent = 'Salvar';
+        cancelEditBtn.style.display = 'none';
+        document.getElementById('iconPreview').style.display = 'none';
+    }
+
+    async function fetchJogos() {
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="color:#94a3b8;">Carregando...</td></tr>`;
+        try {
+            const res = await fetch(apiBase, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Erro ao carregar jogos');
+            const data = await res.json();
+            jogos = data || [];
+        } catch (err) {
+            showMessage('error', err.message);
+            jogos = [];
+        }
+        renderJogos();
+    }
+
+    function renderJogos() {
+        const term = (filtro.value || '').toLowerCase().trim();
+        const lista = term
+            ? jogos.filter(j => (j.nome || '').toLowerCase().includes(term))
+            : jogos;
+
+        if (!lista.length) {
+            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 7 : 6}" style="color:#94a3b8;">Nenhum jogo cadastrado.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = lista.map(j => `
+            <tr>
+                <td>${j.nome || '-'}</td>
+                <td>${j.descricao || '-'}</td>
+                <td>${j.identificacao_unity || '-'}</td>
+                <td>${j.link_jogar ? `<a href="${j.link_jogar}" target="_blank">Abrir</a>` : '—'}</td>
+                <td>${j.icone_url ? `<img src="${j.icone_url}" alt="icone" style="width:32px;height:32px;border-radius:6px;">` : '—'}</td>
+                <td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>
+                ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
+            </tr>
+        `).join('');
+    }
+
+    window.editarJogo = (j) => {
+        if (!isAdmin || !form) return;
+        jogoIdInput.value = j._id;
+        document.getElementById('nome').value = j.nome || '';
+        document.getElementById('descricao').value = j.descricao || '';
+        document.getElementById('identificacao_unity').value = j.identificacao_unity || '';
+        document.getElementById('link_jogar').value = j.link_jogar || '';
+        document.getElementById('icone').value = '';
+        document.getElementById('total_niveis').value = j.total_niveis || '';
+        document.getElementById('xp_maxima').value = j.xp_maxima || '';
+        
+        // Mostrar imagem atual se existir
+        const iconPreview = document.getElementById('iconPreview');
+        const iconPreviewImg = document.getElementById('iconPreviewImg');
+        if (j.icone_url) {
+            iconPreviewImg.src = j.icone_url;
+            iconPreview.style.display = 'block';
+        } else {
+            iconPreview.style.display = 'none';
+        }
+        
+        submitLabel.textContent = 'Atualizar';
+        cancelEditBtn.style.display = 'inline-flex';
+    };
+
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener('click', resetForm);
+    }
+
+    if (isAdmin && form) {
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const nomeVal = document.getElementById('nome').value.trim();
+        const descVal = document.getElementById('descricao').value.trim();
+        const unityVal = document.getElementById('identificacao_unity').value.trim();
+
+        if (!nomeVal || !descVal || !unityVal) {
+            showMessage('error', 'Preencha os campos obrigatórios.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('nome', nomeVal);
+        formData.append('descricao', descVal);
+        formData.append('identificacao_unity', unityVal);
+        formData.append('link_jogar', document.getElementById('link_jogar').value.trim());
+        
+        const totalNiveis = document.getElementById('total_niveis').value.trim();
+        if (totalNiveis) formData.append('total_niveis', totalNiveis);
+        
+        const xpMaxima = document.getElementById('xp_maxima').value.trim();
+        if (xpMaxima) formData.append('xp_maxima', xpMaxima);
+
+        // Adicionar arquivo se selecionado
+        const iconeInput = document.getElementById('icone');
+        if (iconeInput.files.length > 0) {
+            formData.append('icone', iconeInput.files[0]);
+        }
+
+        const isEdit = !!jogoIdInput.value;
+        try {
+            const res = await fetch(isEdit ? `${apiBase}/${jogoIdInput.value}` : apiBase, {
+                method: isEdit ? 'PUT' : 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+            showMessage('success', isEdit ? 'Jogo atualizado' : 'Jogo criado');
+            resetForm();
+            fetchJogos();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    });
+    }
+
+    window.removerJogo = async (id) => {
+        if (!isAdmin) return;
+        if (!confirm('Remover este jogo?')) return;
+        try {
+            const res = await fetch(`${apiBase}/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover');
+            showMessage('success', 'Jogo removido');
+            fetchJogos();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    fetchJogos();
+</script>
+</body>
+</html>

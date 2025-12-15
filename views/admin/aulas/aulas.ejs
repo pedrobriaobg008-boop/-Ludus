@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aulas - Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <%- include('../../partials/sidebar') %>
+        <main class="main-content">
+            <h1>Aulas</h1>
+            <div class="search-bar">
+                <input type="text" placeholder="Pesquisa...">
+                <select>
+                    <option>DatePicker</option>
+                </select>
+                <button>Horário 1</button>
+                <button>Horário 2</button>
+            </div>
+            <table class="aulas-table">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Jogo</th>
+                        <th>Fase</th>
+                        <th>Aluno(a)</th>
+                        <th>Tempo em fase</th>
+                        <th>Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>12/10/2023 13:23:46</td>
+                        <td>Conhecendo os Animais</td>
+                        <td>Fase 1</td>
+                        <td>Bruna</td>
+                        <td>12 minutos</td>
+                        <td><a href="/detalhes" style="text-decoration:none;color:#888;font-size:22px;font-weight:bold;">...</a></td>
+                    </tr>
+                    <tr>
+                        <td>12/10/2023 13:25:43</td>
+                        <td>Conhecendo os Animais</td>
+                        <td>Fase 2</td>
+                        <td>Lobato</td>
+                        <td>15 minutos</td>
+                        <td><a href="/detalhes" style="text-decoration:none;color:#888;font-size:22px;font-weight:bold;">...</a></td>
+                    </tr>
+                    <tr>
+                        <td>12/10/2023 13:26:23</td>
+                        <td>Conhecendo os Animais</td>
+                        <td>Fase 2</td>
+                        <td>Renatinha</td>
+                        <td>36 minutos</td>
+                        <td><a href="/detalhes" style="text-decoration:none;color:#888;font-size:22px;font-weight:bold;">...</a></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <span>Voltar</span>
+                <span class="active">1</span>
+                <span>2</span>
+                <span>3</span>
+                <span>Próxima</span>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

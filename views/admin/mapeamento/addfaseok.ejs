@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeamento de Jogos</title>
+    <style>
+        body {
+            background: #f5f6fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            background: #fff;
+            width: 270px;
+            padding: 0;
+            box-shadow: 2px 0 12px rgba(37,99,235,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            height: 100vh;
+        }
+        .logo-space {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 110px;
+            border-bottom: 1px solid #eaf0fe;
+            margin-bottom: 0;
+        }
+        .logo-space img {
+            height: 48px;
+            filter: drop-shadow(0 2px 8px #2563eb22);
+        }
+        .menu {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-top: 24px;
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 32px;
+            height: 48px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #2563eb;
+            text-decoration: none;
+            border-radius: 8px 0 0 8px;
+            transition: background 0.2s, color 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .menu-item.active {
+            background: #2563eb;
+            color: #fff;
+            box-shadow: 2px 0 8px #2563eb22;
+        }
+        .menu-item:not(.active):hover {
+            background: #eaf0fe;
+            color: #1746a2;
+        }
+        .menu-icon {
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 60px;
+        }
+        .main-content h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #222;
+            letter-spacing: 1px;
+        }
+        .search-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .search-bar input[type="text"] {
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 15px;
+            width: 220px;
+            background: #fff;
+        }
+        .fase-btn {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 22px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 16px;
+            box-shadow: 0 2px 8px #2563eb22;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .fase-btn .fase-dot {
+            width: 10px;
+            height: 10px;
+            background: #3ad66e;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .insert-cena-link {
+            color: #2563eb;
+            font-size: 14px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .insert-cena-link:hover {
+            text-decoration: underline;
+            color: #1746a2;
+        }
+        .form-mapeamento {
+            margin-top: 32px;
+            min-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            align-items: flex-start;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+        .form-group label {
+            font-size: 14px;
+            color: #222;
+            font-weight: 500;
+        }
+        .form-group input {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            background: #fff;
+            transition: border-color 0.2s;
+            width: 230px;
+        }
+        .form-group input:focus {
+            border-color: #2563eb;
+            outline: none;
+            background: #eaf0fe;
+        }
+        .add-link {
+            color: #2563eb;
+            font-size: 13px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-weight: 400;
+            margin-top: 4px;
+        }
+        .add-link:hover {
+            text-decoration: underline;
+            color: #1746a2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <%- include('../../partials/sidebar') %>
+        <main class="main-content">
+            <h1>Mapeamento de Jogos</h1>
+            <form class="form-mapeamento" autocomplete="off">
+                <div class="form-group">
+                    <label for="nome-jogo">Nome do Jogo</label>
+                    <input type="text" id="nome-jogo" name="nome-jogo">
+                </div>
+                <a class="add-link" href="/addfase" id="btnInserirFase">
+                    <span style="font-size:16px;">&#43;</span> Inserir Fase
+                </a>
+            </form>
+            <button type="button" class="fase-btn" id="fase-btn">
+                Fase <span id="nome-fase-btn"><%= typeof nomeFase !== 'undefined' ? nomeFase : 'Jack Daniel\'s' %></span>
+            </button>
+            <a class="insert-cena-link" href="/addcena">
+                <span style="font-size:16px;">&#43;</span> Inserir Cena na fase atual
+            </a>
+        </main>
+    </div>
+    <script>
+        // Se você quiser que o nome do jogo digitado fique salvo ou usado, pode adicionar JS aqui.
+        // Para mostrar o nome da fase digitado, passe ele via render do servidor:
+        // res.render('admin/mapeamento/addfaseok', { nomeFase: req.query['nome-fase'] });
+    </script>
+</body>
+</html>

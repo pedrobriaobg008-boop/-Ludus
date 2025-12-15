@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuários da Instituição - Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 12px; }
+        .field label { display: block; font-size: 14px; color: #475569; margin-bottom: 6px; }
+        .field input { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+        .field input[readonly] { background: #f1f5f9; color: #64748b; cursor: not-allowed; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; cursor: pointer; }
+        .chip input { cursor: pointer; }
+        .actions { display: flex; gap: 8px; }
+        .btn { border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-ghost { background: #f1f5f9; color: #0f172a; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { color: #475569; font-weight: 700; font-size: 14px; }
+        td { color: #0f172a; font-size: 14px; }
+        .alert { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; }
+        .alert.success { background: #ecfdf3; color: #15803d; border: 1px solid #bbf7d0; }
+        .alert.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecdd3; }
+        .id-field { color: #94a3b8; font-size: 12px; }
+        @media (max-width: 640px) {
+            .actions { flex-direction: column; }
+            th:nth-child(4), td:nth-child(4) { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <h1>👥 Usuários da Instituição</h1>
+
+        <% function labelPerfil(p){
+            const n = (p||'').toString().toLowerCase().trim();
+            if (n==='admin' || n==='administrador' || n==='adm') return 'Administrador';
+            if (n==='professor') return 'Professor';
+            if (n==='colaborador') return 'Colaborador';
+            if (n==='pesquisador') return 'Pesquisador';
+            if (n==='coordenador') return 'Coordenador';
+            return p;
+        } %>
+
+        <div class="card" style="margin-bottom:16px;">
+            <h3 style="margin-top:0;">Meu Perfil</h3>
+            <div class="grid-2">
+                <div class="field">
+                    <label>Nome</label>
+                    <input type="text" value="<%= (currentUser && currentUser.nome_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Email</label>
+                    <input type="text" value="<%= (currentUser && currentUser.email_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Instituição</label>
+                    <input type="text" value="<%= (currentUser && currentUser.instituicao_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Perfil</label>
+                    <input type="text" value="<%= (currentUser && Array.isArray(currentUser.perfil) ? currentUser.perfil.map(labelPerfil).join(', ') : (currentUser && labelPerfil(currentUser.perfil)) ) || '—' %>" readonly>
+                </div>
+            </div>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <div class="card" style="margin-bottom:16px;">
+            <form id="usuarioForm">
+                <input type="hidden" id="usuarioId">
+                <div class="grid-2">
+                    <div class="field" id="idField" style="display:none;">
+                        <label>ID</label>
+                        <input type="text" id="mostrarId" readonly placeholder="Será mostrado ao editar">
+                    </div>
+                    <div class="field">
+                        <label>Nome do Usuário *</label>
+                        <input type="text" id="nome_usuario" placeholder="Ex: Maria Souza" required>
+                    </div>
+                    <div class="field">
+                        <label>Email *</label>
+                        <input type="email" id="email_usuario" placeholder="email@instituicao.com" required>
+                    </div>
+                    <div class="field">
+                        <label>Instituição *</label>
+                        <input type="text" id="instituicao_usuario" placeholder="Nome da instituição" required>
+                    </div>
+                    <div class="field">
+                        <label>Senha *<span style="color:#94a3b8;"></span></label>
+                        <input type="password" id="senha_usuario" placeholder="********">
+                    </div>
+                    <div class="field" style="grid-column: 1/-1;">
+                        <label>Perfil (selecione um)</label>
+                        <div class="chips">
+                            <label class="chip"><input type="radio" name="perfilSingle" value="Administrador"> Administrador</label>
+                            <label class="chip"><input type="radio" name="perfilSingle" value="Professor"> Professor</label>
+                            <label class="chip"><input type="radio" name="perfilSingle" value="Coordenador"> Coordenador</label>
+                            <label class="chip"><input type="radio" name="perfilSingle" value="Colaborador"> Colaborador</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions" style="margin-top:12px;">
+                    <button type="submit" class="btn btn-primary" id="submitLabel">Salvar</button>
+                    <button type="button" class="btn btn-ghost" id="cancelEdit" style="display:none;">Cancelar edição</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h3 style="margin:0;">Usuários cadastrados</h3>
+                <span id="listaCount" style="color:#64748b; font-size:14px;"></span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Instituição</th>
+                        <th>Perfil</th>
+                        <th style="width:150px;">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="usuariosBody">
+                    <tr><td colspan="5" style="color:#94a3b8;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const apiBase = '/api/usuarios-instituicao';
+    const form = document.getElementById('usuarioForm');
+    const userIdInput = document.getElementById('usuarioId');
+    const mostrarId = document.getElementById('mostrarId');
+    const idField = document.getElementById('idField');
+    const alertBox = document.getElementById('alert');
+    const tbody = document.getElementById('usuariosBody');
+    const listaCount = document.getElementById('listaCount');
+    const submitLabel = document.getElementById('submitLabel');
+    const cancelEditBtn = document.getElementById('cancelEdit');
+
+    const perfilValue = () => (document.querySelector('input[name="perfilSingle"]:checked')?.value || '').trim();
+
+    function showMessage(type, msg) {
+        alertBox.textContent = msg;
+        alertBox.className = 'alert ' + type;
+        alertBox.style.display = 'block';
+        setTimeout(() => { alertBox.style.display = 'none'; }, 3000);
+    }
+
+    function resetForm() {
+        form.reset();
+        userIdInput.value = '';
+        mostrarId.value = '';
+        idField.style.display = 'none';
+        submitLabel.textContent = 'Salvar';
+        cancelEditBtn.style.display = 'none';
+    }
+
+    async function fetchUsuarios() {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Carregando...</td></tr>';
+        const res = await fetch(apiBase, { credentials: 'same-origin' });
+        const data = await res.json();
+        renderUsuarios(data || []);
+    }
+
+    function renderUsuarios(lista) {
+        listaCount.textContent = lista.length ? `${lista.length} usuário(s)` : 'Nenhum usuário';
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Nenhum usuário cadastrado.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = lista.map(u => `
+            <tr>
+                <td>${u.nome_usuario || '-'}</td>
+                <td>${u.email_usuario || '-'}</td>
+                <td>${u.instituicao_usuario || '-'}</td>
+                <td>${Array.isArray(u.perfil) ? ((u.perfil.map(p => (['admin','administrador','adm'].includes((p||'').toString().toLowerCase().trim()) ? 'Administrador' : p)).join(', ')) || '—') : ((['admin','administrador','adm'].includes((u.perfil||'').toString().toLowerCase().trim()) ? 'Administrador' : (u.perfil||'')) || '—')}</td>
+                <td>
+                    <div class="actions">
+                        <button class="btn btn-ghost" onclick='editarUsuario(${JSON.stringify(u)})'>Editar</button>
+                        <button class="btn btn-danger" onclick="removerUsuario('${u._id}')">Remover</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    window.editarUsuario = (u) => {
+        userIdInput.value = u._id;
+        mostrarId.value = u._id;
+        idField.style.display = 'block';
+        document.getElementById('nome_usuario').value = u.nome_usuario || '';
+        document.getElementById('email_usuario').value = u.email_usuario || '';
+        document.getElementById('instituicao_usuario').value = u.instituicao_usuario || '';
+        document.getElementById('senha_usuario').value = '';
+        document.querySelectorAll('input[name="perfilSingle"]').forEach(r => {
+            const norm = (v) => (typeof v === 'string' ? v.toLowerCase().trim() : v);
+            const up = u.perfil;
+            const rnorm = norm(r.value);
+            const has = Array.isArray(up) ? up.map(norm).some(v => v===rnorm || (v==='admin' && rnorm==='administrador')) : (norm(up)===rnorm || (norm(up)==='admin' && rnorm==='administrador'));
+            r.checked = !!has;
+        });
+        submitLabel.textContent = 'Atualizar';
+        cancelEditBtn.style.display = 'inline-flex';
+    };
+
+    cancelEditBtn.addEventListener('click', resetForm);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            nome_usuario: document.getElementById('nome_usuario').value.trim(),
+            email_usuario: document.getElementById('email_usuario').value.trim(),
+            instituicao_usuario: document.getElementById('instituicao_usuario').value.trim(),
+            perfil: perfilValue()
+        };
+        const senha = document.getElementById('senha_usuario').value.trim();
+        const isEdit = !!userIdInput.value;
+
+        if (!payload.nome_usuario || !payload.email_usuario || !payload.instituicao_usuario) {
+            showMessage('error', 'Preencha os campos obrigatórios.');
+            return;
+        }
+        if (!isEdit && !senha) {
+            showMessage('error', 'Senha é obrigatória no cadastro.');
+            return;
+        }
+        if (senha) payload.senha_usuario = senha;
+
+        try {
+            const res = await fetch(isEdit ? `${apiBase}/${userIdInput.value}` : apiBase, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+            showMessage('success', isEdit ? 'Usuário atualizado' : 'Usuário criado');
+            resetForm();
+            fetchUsuarios();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    });
+
+    window.removerUsuario = async (id) => {
+        if (!confirm('Remover este usuário?')) return;
+        try {
+            const res = await fetch(`${apiBase}/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover');
+            showMessage('success', 'Usuário removido');
+            fetchUsuarios();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    fetchUsuarios();
+</script>
+</body>
+</html>

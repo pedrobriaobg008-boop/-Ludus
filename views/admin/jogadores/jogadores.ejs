@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogadores por Turma - Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .page-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+        .page-desc { color: #64748b; font-size: 13px; margin-top: 4px; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); margin-bottom: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+        .field label { display: block; font-size: 14px; color: #475569; margin-bottom: 6px; font-weight: 600; }
+        .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 14px; }
+        .actions { display: flex; gap: 8px; }
+        .btn { border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-ghost { background: #f1f5f9; color: #0f172a; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        th { color: #475569; font-weight: 700; font-size: 14px; background: #f8fafc; }
+        td { color: #0f172a; font-size: 14px; vertical-align: middle; }
+        .alert { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; }
+        .alert.success { background: #ecfdf3; color: #15803d; border: 1px solid #bbf7d0; }
+        .alert.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecdd3; }
+        .search-box { margin: -4px 0 10px 0; }
+        .search-box input { width: 240px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 14px; }
+        .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
+        .section-title h3 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
+        @media (max-width: 640px) {
+            .actions { flex-direction: column; }
+            .page-head { flex-direction: column; }
+            th:nth-child(4), td:nth-child(4) { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <div class="page-head">
+            <div>
+                <h1>👨‍🎓 Jogadores por Turma</h1>
+                <p class="page-desc">Cadastre jogadores vinculados a turmas específicas. Cada jogador tem login e senha próprios.</p>
+            </div>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <section class="card">
+            <form id="jogadorForm">
+                <input type="hidden" id="jogadorId">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Nome do Jogador *</label>
+                        <input type="text" id="nome_jogador" required placeholder="Ex: João Silva" autofocus>
+                    </div>
+                    <div class="field">
+                        <label>Login *</label>
+                        <input type="text" id="login" required placeholder="Ex: joao.silva" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label>Senha * <span style="color:#94a3b8;font-size:12px;">(deixe vazio para não alterar ao editar)</span></label>
+                        <input type="password" id="senha" placeholder="Mínimo 6 caracteres" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label>Turma *</label>
+                        <select id="turma" required>
+                            <option value="">-- Selecione uma turma --</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Criador (Usuário) *</label>
+                        <select id="createdBy" required>
+                            <option value="">-- Selecione um usuário --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                    <button type="submit" class="btn btn-primary" id="submitLabel">Salvar</button>
+                    <button type="button" class="btn btn-ghost" id="cancelEdit" style="display: none;">Cancelar edição</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card">
+            <div class="section-title">
+                <h3>Jogadores cadastrados</h3>
+                <div class="search-box">
+                    <input type="text" id="filtro" placeholder="Filtrar por nome ou login..." oninput="renderJogadores()">
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome do Jogador</th>
+                        <th>Login</th>
+                        <th>Turma</th>
+                        <th>Criador</th>
+                        <th>Data de Criação</th>
+                        <th style="width: 160px;">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="jogadoresBody">
+                    <tr><td colspan="6" style="color: #94a3b8; text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const apiBase = '/api/jogadores';
+    const apiTurmas = '/api/turmas';
+    const apiUsuarios = '/api/usuarios-instituicao';
+    const form = document.getElementById('jogadorForm');
+    const alertBox = document.getElementById('alert');
+    const tbody = document.getElementById('jogadoresBody');
+    const filtro = document.getElementById('filtro');
+    const cancelEditBtn = document.getElementById('cancelEdit');
+    const submitLabel = document.getElementById('submitLabel');
+    const jogadorIdInput = document.getElementById('jogadorId');
+    const turmaSelect = document.getElementById('turma');
+    const createdBySelect = document.getElementById('createdBy');
+
+    let jogadores = [];
+    let turmas = {};
+    let usuarios = {};
+
+    function showMessage(type, msg) {
+        alertBox.textContent = msg;
+        alertBox.className = 'alert ' + type;
+        alertBox.style.display = 'block';
+        setTimeout(() => { alertBox.style.display = 'none'; }, 3000);
+    }
+
+    function resetForm() {
+        form.reset();
+        jogadorIdInput.value = '';
+        submitLabel.textContent = 'Salvar';
+        cancelEditBtn.style.display = 'none';
+    }
+
+    async function fetchTurmas() {
+        try {
+            const res = await fetch(apiTurmas);
+            const data = await res.json();
+            turmas = {};
+            (data || []).forEach(t => {
+                turmas[t._id] = t.nome_turma;
+            });
+            
+            turmaSelect.innerHTML = '<option value="">-- Selecione uma turma --</option>';
+            Object.entries(turmas).forEach(([id, nome]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = nome;
+                turmaSelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Erro ao carregar turmas:', err);
+        }
+    }
+
+    async function fetchUsuarios() {
+        try {
+            const res = await fetch(apiUsuarios);
+            const data = await res.json();
+            usuarios = {};
+            (data || []).forEach(u => {
+                usuarios[u._id] = u.nome_usuario;
+            });
+            
+            createdBySelect.innerHTML = '<option value="">-- Selecione um usuário --</option>';
+            Object.entries(usuarios).forEach(([id, nome]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = nome;
+                createdBySelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Erro ao carregar usuários:', err);
+        }
+    }
+
+    async function fetchJogadores() {
+        tbody.innerHTML = '<tr><td colspan="6" style="color: #94a3b8; text-align: center;">Carregando...</td></tr>';
+        try {
+            const res = await fetch(apiBase);
+            const data = await res.json();
+            jogadores = data || [];
+            renderJogadores();
+        } catch (err) {
+            console.error('Erro ao carregar jogadores:', err);
+            showMessage('error', 'Erro ao carregar jogadores');
+        }
+    }
+
+    function renderJogadores() {
+        const term = (filtro.value || '').toLowerCase().trim();
+        const lista = term
+            ? jogadores.filter(j => 
+                (j.nome_jogador || '').toLowerCase().includes(term) ||
+                (j.login || '').toLowerCase().includes(term)
+            )
+            : jogadores;
+
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color: #94a3b8; text-align: center;">Nenhum jogador cadastrado.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = lista.map(j => {
+            const nomeTurma = j.turma && j.turma._id 
+                ? (turmas[j.turma._id] || j.turma.nome_turma || j.turma._id)
+                : '—';
+            const nomeCriador = j.createdBy && j.createdBy._id
+                ? (usuarios[j.createdBy._id] || j.createdBy.nome_usuario || j.createdBy._id)
+                : '—';
+            const dataCriacao = j.createdAt 
+                ? new Date(j.createdAt).toLocaleDateString('pt-BR')
+                : '—';
+            
+            return `
+                <tr>
+                    <td><strong>${j.nome_jogador || '-'}</strong></td>
+                    <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">${j.login || '-'}</code></td>
+                    <td>${nomeTurma}</td>
+                    <td>${nomeCriador}</td>
+                    <td>${dataCriacao}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn btn-ghost" onclick='editarJogador(${JSON.stringify(j)})'>Editar</button>
+                            <button class="btn btn-danger" onclick="removerJogador('${j._id}')">Remover</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.editarJogador = (j) => {
+        jogadorIdInput.value = j._id;
+        document.getElementById('nome_jogador').value = j.nome_jogador || '';
+        document.getElementById('login').value = j.login || '';
+        document.getElementById('senha').value = '';
+        turmaSelect.value = j.turma && j.turma._id ? j.turma._id : '';
+        createdBySelect.value = j.createdBy && j.createdBy._id ? j.createdBy._id : '';
+        submitLabel.textContent = 'Atualizar';
+        cancelEditBtn.style.display = 'inline-flex';
+    };
+
+    cancelEditBtn.addEventListener('click', resetForm);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            nome_jogador: document.getElementById('nome_jogador').value.trim(),
+            login: document.getElementById('login').value.trim(),
+            turma: turmaSelect.value,
+            createdBy: createdBySelect.value
+        };
+        const senha = document.getElementById('senha').value.trim();
+        const isEdit = !!jogadorIdInput.value;
+
+        if (!payload.nome_jogador || !payload.login || !payload.turma || !payload.createdBy) {
+            showMessage('error', 'Preencha todos os campos obrigatórios.');
+            return;
+        }
+        if (!isEdit && !senha) {
+            showMessage('error', 'Senha é obrigatória no cadastro.');
+            return;
+        }
+        if (isEdit && !senha) {
+            // Edição sem alterar senha
+        } else if (senha) {
+            if (senha.length < 6) {
+                showMessage('error', 'Senha deve ter mínimo 6 caracteres.');
+                return;
+            }
+            payload.senha = senha;
+        }
+
+        const endpoint = isEdit ? `${apiBase}/${jogadorIdInput.value}` : apiBase;
+        try {
+            const res = await fetch(endpoint, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+            showMessage('success', isEdit ? 'Jogador atualizado' : 'Jogador criado');
+            resetForm();
+            fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    });
+
+    window.removerJogador = async (id) => {
+        if (!confirm('Remover este jogador?')) return;
+        try {
+            const res = await fetch(`${apiBase}/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover');
+            showMessage('success', 'Jogador removido');
+            fetchJogadores();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    async function init() {
+        await fetchTurmas();
+        await fetchUsuarios();
+        await fetchJogadores();
+    }
+
+    init();
+</script>
+</body>
+</html>

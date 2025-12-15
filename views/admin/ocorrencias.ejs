@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocorrências • Detalhes</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <%- include('../partials/sidebar') %>
+        <main class="main-content">
+            <h1>Ocorrências &bull; Detalhes</h1>
+            <div class="stats">
+                Total de cliques: <strong>52k</strong><br>
+                Tempo de interação: <strong>2,200h</strong>
+            </div>
+            <div class="details-header">
+                <span class="details-header-title">Conhecendo os animais - Cena X</span>
+                <span class="details-header-dates">25/03/2024 9:58PM &bull; 25/03/2024 11:38PM</span>
+            </div>
+            <div class="table-controls">
+                <label for="mostrar">Mostrar</label>
+                <select id="mostrar">
+                    <option>10</option>
+                    <option>20</option>
+                    <option>50</option>
+                </select>
+                <input type="text" placeholder="Pesquisa..." />
+            </div>
+            <table class="details-table">
+                <thead>
+                    <tr>
+                        <th>Horário</th>
+                        <th>Descrição</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>13:23:46</td>
+                        <td>[+LUDUS-monitor-start]</td>
+                        <td class="action-green">Iniciar Cena</td>
+                    </tr>
+                    <tr>
+                        <td>13:25:43</td>
+                        <td>POS[513;235;0]</td>
+                        <td class="action-normal">Mover</td>
+                    </tr>
+                    <tr>
+                        <td>13:26:23</td>
+                        <td>[+LUDUS-monitor-end]</td>
+                        <td class="action-red">Finalizar Cena</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination">
+                <span>Voltar</span>
+                <span class="active">1</span>
+                <span>2</span>
+                <span>3</span>
+                <span>Próxima</span>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 12px; }
+        .field label { display: block; font-size: 14px; color: #475569; margin-bottom: 6px; }
+        .field input { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+        .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #f1f5f9; color: #0f172a; font-size: 12px; margin-right: 6px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <h1>👤 Meu Perfil</h1>
+        <div class="card">
+            <div class="grid-2">
+                <div class="field">
+                    <label>Nome</label>
+                    <input type="text" value="<%= (currentUser && currentUser.nome_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Email</label>
+                    <input type="text" value="<%= (currentUser && currentUser.email_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Instituição</label>
+                    <input type="text" value="<%= (currentUser && currentUser.instituicao_usuario) || '-' %>" readonly>
+                </div>
+                <div class="field">
+                    <label>Perfil</label>
+                    <div>
+                        <% const labelPerfil = (p) => { const n=(p||'').toString().toLowerCase().trim(); if(n==='admin'||n==='administrador'||n==='adm') return 'Administrador'; if(n==='professor') return 'Professor'; if(n==='colaborador') return 'Colaborador'; if(n==='pesquisador') return 'Pesquisador'; if(n==='coordenador') return 'Coordenador'; return p; }; %>
+                        <span class="pill"><%= (currentUser && Array.isArray(currentUser.perfil) ? currentUser.perfil.map(labelPerfil).join(', ') : (currentUser && labelPerfil(currentUser.perfil))) || '—' %></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
