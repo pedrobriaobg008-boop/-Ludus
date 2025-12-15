@@ -48,12 +48,30 @@ async function ensureAdmin() {
 }
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(async () => {
+
+// Variável para controlar se o MongoDB já foi inicializado
+let isMongoConnected = false;
+
+// Função para garantir conexão MongoDB (importante para serverless)
+async function connectMongo() {
+  if (isMongoConnected && mongoose.connection.readyState === 1) {
+    return;
+  }
+  
+  try {
+    await mongoose.connect(MONGO_URI, { 
+      useNewUrlParser: true, 
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000
+    });
     console.log('MongoDB conectado');
+    isMongoConnected = true;
     await ensureAdmin();
-  })
-  .catch(err => console.error('Erro ao conectar MongoDB:', err));
+  } catch (err) {
+    console.error('Erro ao conectar MongoDB:', err);
+    throw err;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -116,6 +134,17 @@ const isAdminPerfil = (perfil) => {
   }
   return false;
 };
+
+// Middleware para garantir conexão MongoDB antes de processar requisições
+app.use(async (req, res, next) => {
+  try {
+    await connectMongo();
+    next();
+  } catch (err) {
+    console.error('Erro na conexão MongoDB:', err);
+    res.status(503).json({ error: 'Serviço temporariamente indisponível' });
+  }
+});
 
 // Expor usuário atual às views
 app.use((req, res, next) => {
@@ -532,5 +561,10 @@ app.get('/jogadores', (req, res) => {
   res.redirect('/turmas');
 });
 
-// Exporta o handler compatível com Vercel
-export default app;
+// Handler para Vercel Serverless
+export default async (req, res) => {
+  // Garantir que MongoDB está conectado
+  await connectMongo();
+  // Processar a requisição através do Express
+  return app(req, res);
+};
