@@ -107,7 +107,9 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
     });
     isConnected = true;
-    console.log('✅ MongoDB conectado com sucesso');
+    const dbName = mongoose.connection.name;
+    const dbHost = mongoose.connection.host;
+    console.log(`✅ MongoDB conectado: ${dbHost}/${dbName}`);
   } catch (err) {
     console.error('❌ Erro ao conectar MongoDB:', err.message);
     isConnected = false;
