@@ -78,6 +78,12 @@ const upload = multer({
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
 
+// Validar MONGO_URI em produção
+if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
+  console.error('❌ ERRO: MONGO_URI não configurado no Vercel!');
+  console.error('Configure em: Vercel Dashboard > Settings > Environment Variables');
+}
+
 let isConnected = false;
 
 const connectDB = async () => {
@@ -85,17 +91,22 @@ const connectDB = async () => {
     return;
   }
 
+  if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
+    throw new Error('MONGO_URI não configurado. Configure no Vercel: Settings > Environment Variables');
+  }
+
   try {
+    console.log('Conectando ao MongoDB...');
     await mongoose.connect(MONGO_URI, { 
       useNewUrlParser: true, 
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
     isConnected = true;
-    console.log('MongoDB conectado');
+    console.log('✅ MongoDB conectado com sucesso');
   } catch (err) {
-    console.error('Erro ao conectar MongoDB:', err);
+    console.error('❌ Erro ao conectar MongoDB:', err.message);
     isConnected = false;
     throw err;
   }
