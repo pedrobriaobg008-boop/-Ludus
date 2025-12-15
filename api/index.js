@@ -6,6 +6,12 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'express-session';
+
+// Caminho correto das views e public
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Models
 import Usuario from '../models/Usuario.js';
 import Jogo from '../models/Jogo.js';
 import Turma from '../models/Turma.js';
@@ -13,13 +19,62 @@ import Jogador from '../models/Jogador.js';
 
 dotenv.config();
 
-// Log runtime errors to diagnose crashes
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason);
+const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.set('view engine', 'ejs');
+
+// Servir arquivos estáticos
+app.use(express.static(join(__dirname, '../public')));
+app.set('views', join(__dirname, '../views'));
+
+// Sessões para autenticação
+app.use(
+  session({
+    name: 'sid',
+    secret: process.env.SESSION_SECRET || 'dev-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+// Configurar multer para upload de imagens
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, join(__dirname, '../public', 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = file.originalname.split('.').pop();
+    cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
+  }
 });
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Apenas imagens são permitidas'), false);
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+// Conectar ao MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
+mongoose.connect(MONGO_URI, { 
+  useNewUrlParser: true, 
+  useUnifiedTopology: true 
+})
+.then(() => console.log('MongoDB conectado'))
+.catch(err => console.error('Erro ao conectar MongoDB:', err));
 
 // Garantir admin existente
 async function ensureAdmin() {
@@ -46,93 +101,7 @@ async function ensureAdmin() {
     console.error('Falha ao garantir admin:', e);
   }
 }
-
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
-
-// Variável para controlar se o MongoDB já foi inicializado
-let mongoPromise = null;
-
-// Função para garantir conexão MongoDB (importante para serverless)
-async function connectMongo() {
-  // Se já existe uma conexão ativa, retorna imediatamente
-  if (mongoose.connection.readyState === 1) {
-    return;
-  }
-  
-  // Se já está conectando, aguarda a promise existente
-  if (mongoPromise) {
-    return mongoPromise;
-  }
-  
-  // Inicia nova conexão
-  mongoPromise = mongoose.connect(MONGO_URI, { 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  })
-  .then(async () => {
-    console.log('MongoDB conectado');
-    await ensureAdmin();
-    mongoPromise = null; // Limpa a promise após conectar
-  })
-  .catch(err => {
-    console.error('Erro ao conectar MongoDB:', err);
-    mongoPromise = null; // Limpa em caso de erro
-    throw err;
-  });
-  
-  return mongoPromise;
-}
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const app = express();
-
-// Sessões para autenticação
-app.use(
-  session({
-    name: 'sid',
-    secret: process.env.SESSION_SECRET || 'dev-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
-  })
-);
-
-// Configurar multer para upload de imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, join(__dirname, '../public', 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'jogo-' + uniqueSuffix + join(file.originalname).split('.').pop());
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Apenas imagens são permitidas'), false);
-  }
-};
-
-const upload = multer({ storage, fileFilter });
-
-app.set('view engine', 'ejs');
-app.set('views', join(__dirname, '../views'));
-
-app.use(express.static(join(__dirname, '../public')));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+ensureAdmin();
 
 // Helper para checar se é admin (aceita string ou array, e variações)
 const isAdminPerfil = (perfil) => {
@@ -167,38 +136,21 @@ const requireAuthApi = (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-  const user = req.sessiasync (req, res, next) => {
-  try {
-    await connectMongo();
-    if (!req.session?.user) return res.redirect('/');
-    next();
-  } catch (err) {
-    console.error('Erro DB:', err);
-    res.status(503).send('Serviço temporariamente indisponível');
+  const user = req.session?.user;
+  if (!user || !isAdminPerfil(user.perfil)) {
+    return req.originalUrl.startsWith('/api')
+      ? res.status(403).json({ error: 'Acesso negado' })
+      : res.redirect('/');
   }
+  next();
 };
-
-const requireAuthApi = async (req, res, next) => {
-  try {
-    await conasync (req, res) => {
-  try {
-    await connectMongo();
-    res.render('auth/login', { title: 'Ludus - Login' });
-  } catch (err) {
-    console.error('Erro DB:', err);
-    res.status(503).send('Serviço temporariamente indisponível');
-  }
-});
-
-// Login/Logout
-app.post('/login', async (req, res) => {
-  try {
-    await connectMongo();
 
 const getUserId = (req) => req.session?.user?.id;
 const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) === String(userId);
 
-// ==== VIEWS (mantidas) ====
+// ============ ROTAS ============
+
+// ==== VIEWS ====
 app.get('/', (req, res) => {
   res.render('auth/login', { title: 'Ludus - Login' });
 });
@@ -242,33 +194,41 @@ app.get('/logout', (req, res) => {
 app.get('/ocorrencias', requireAuthView, (req, res) => {
   res.render('admin/ocorrencias', { title: 'Ocorrências - Ludus' });
 });
+
 app.get('/aulas', requireAuthView, (req, res) => {
   res.render('admin/aulas/aulas', { title: 'Aulas - Ludus' });
 });
+
 app.get('/detalhes', requireAuthView, (req, res) => {
   res.render('admin/aulas/detalhes', { title: 'Fase • Detalhes' });
 });
+
 app.get('/mapeamento', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/mapeamento', { title: 'Mapeamento de Jogos' });
 });
+
 app.get('/addjogo', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addjogo', { title: 'Mapeamento de Jogos' });
 });
+
 app.get('/addfase', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addfase', { title: 'Mapeamento de Jogos' });
 });
+
 app.get('/addfaseok', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addfaseok', { nomeFase: req.query['nome-fase'] });
 });
+
 app.get('/addcena', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcena', { title: 'Mapeamento de Jogos' });
 });
+
 app.get('/addcenaok', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcenaok', { nomeFase: req.query['nome-fase'] });
 });
+
 app.get('/usuario', requireAuthView, async (req, res) => {
   try {
-    await connectMongo();
     const self = await Usuario.findById(req.session.user.id);
     if (isAdminPerfil(req.session?.user?.perfil)) {
       return res.render('admin/usuario/usuario', { title: 'Usuários da Instituição', currentUser: self });
@@ -278,6 +238,14 @@ app.get('/usuario', requireAuthView, async (req, res) => {
     console.error('Erro ao carregar perfil do usuário:', e);
     return res.redirect('/');
   }
+});
+
+app.get('/turmas', requireAuthView, (req, res) => {
+  res.render('admin/turmas/turmas', { title: 'Turmas e Jogadores - Ludus' });
+});
+
+app.get('/jogadores', (req, res) => {
+  res.redirect('/turmas');
 });
 
 // ==== APIs REST ====
@@ -563,24 +531,18 @@ app.put('/api/jogadores/:id', async (req, res) => {
     res.status(500).json({ error: err.message || 'Erro ao atualizar jogador' });
   }
 });
-pp if (!jogador) return notFound(res);
+
+app.delete('/api/jogadores/:id', async (req, res) => {
+  const userId = getUserId(req);
+  const isAdmin = isAdminPerfil(req.session?.user?.perfil);
+  const jogador = await Jogador.findById(req.params.id).populate('turma');
+  if (!jogador) return notFound(res);
   if (!isAdmin && !isOwner(jogador.turma?.createdBy, userId)) return res.status(403).json({ error: 'Acesso negado' });
   await jogador.deleteOne();
   res.json({ ok: true });
 });
 
-app.get('/turmas', requireAuthView, (req, res) => {
-  res.render('admin/turmas/turmas', { title: 'Turmas e Jogadores - Ludus' });
-});
+// ============ FIM ROTAS ============
 
-app.get('/jogadores', (req, res) => {
-  res.redirect('/turmas');
-});
-
-// Handler para Vercel Serverless
-export default async (req, res) => {
-  // Garantir que MongoDB está conectado
-  await connectMongo();
-  // Processar a requisição através do Express
-  return app(req, res);
-};
+// Exporta o handler compatível com Vercel
+export default app;
