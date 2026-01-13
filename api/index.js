@@ -805,6 +805,7 @@ app.post('/api/jogadores', async (req, res) => {
       nome_jogador,
       login: login.toLowerCase(),
       senha_hash: await bcrypt.hash(senha, 10),
+      senha_visivel: senha,
       turma,
       createdBy: isAdmin ? (req.body.createdBy || userId) : userId
     };
@@ -858,7 +859,10 @@ app.put('/api/jogadores/:id', async (req, res) => {
       if (!isAdmin && !isOwner(turmaDoc.createdBy, userId)) return res.status(403).json({ error: 'Acesso negado' });
       jogador.turma = turma;
     }
-    if (senha) jogador.senha_hash = await bcrypt.hash(senha, 10);
+    if (senha) {
+      jogador.senha_hash = await bcrypt.hash(senha, 10);
+      jogador.senha_visivel = senha;
+    }
     await jogador.save();
     res.json(jogador);
   } catch (err) {
