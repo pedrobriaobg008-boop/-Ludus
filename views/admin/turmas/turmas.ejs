@@ -137,13 +137,12 @@
                     <thead>
                     <tr>
                         <th>Turma / Jogador</th>
-                        <th>Senha</th>
                         <th>Data de Criação</th>
                         <th style="width: 200px;">Ações</th>
                     </tr>
                     </thead>
                     <tbody id="tabelaBody">
-                    <tr><td colspan="4" style="color: #94a3b8; text-align: center;">Carregando...</td></tr>
+                    <tr><td colspan="3" style="color: #94a3b8; text-align: center;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -207,6 +206,8 @@
         document.getElementById('senhaAviso').style.display = 'none';
         document.getElementById('senha').type = 'text';
         document.getElementById('toggleSenhaBtn').textContent = '👁';
+        // NÃO limpar turmaSelect - deixar pré-selecionada para adicionar em lote
+        document.getElementById('nome_jogador').focus();
     }
 
     function toggleSenha() {
@@ -300,12 +301,10 @@
             html += `
                 <tr class="turma-row">
                     <td><strong>📚 ${turma.nome_turma}</strong></td>
-                    <td>—</td>
                     <td>${new Date(turma.createdAt).toLocaleDateString('pt-BR')}</td>
                     <td>
                         <div class="actions">
                             <button class="btn btn-ghost btn-sm" onclick='editarTurma(${JSON.stringify(turma)})'>Editar</button>
-                            <button class="btn btn-ghost btn-sm" onclick="adicionarJogadorParaTurma('${turma._id}')">+ Adicionar Jogador</button>
                             <button class="btn btn-danger btn-sm" onclick="removerTurma('${turma._id}')">Remover</button>
                         </div>
                     </td>
@@ -320,7 +319,7 @@
                     html += `
                         <tr>
                             <td style="padding-left:40px;">👤 ${j.nome_jogador || '-'}</td>
-                            <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;">${j.senha_hash ? '••••••••' : '—'}</code></td>
+
                             <td>${j.createdAt ? new Date(j.createdAt).toLocaleDateString('pt-BR') : '—'}</td>
                             <td>
                                 <div class="actions">
@@ -333,13 +332,13 @@
                 });
             } else {
                 if (!term) {
-                    html += `<tr><td colspan="4" style="padding-left:40px; color:#94a3b8;">Nenhum jogador nesta turma</td></tr>`;
+                    html += `<tr><td colspan="3" style="padding-left:40px; color:#94a3b8;">Nenhum jogador nesta turma</td></tr>`;
                 }
             }
         });
 
         if (!html) {
-            html = '<tr><td colspan="4" style="color: #94a3b8; text-align: center;">Nenhuma turma ou jogador encontrado.</td></tr>';
+            html = '<tr><td colspan="3" style="color: #94a3b8; text-align: center;">Nenhuma turma ou jogador encontrado.</td></tr>';
         }
 
         tabelaBody.innerHTML = html;
@@ -362,14 +361,14 @@
         document.getElementById('turmaSelect').value = (j.turma && j.turma._id) || '';
         document.getElementById('nome_jogador').value = j.nome_jogador || '';
         document.getElementById('login').value = j.login || '';
-        document.getElementById('senha').value = j.senha_hash ? '•••••••' : '';
+        document.getElementById('senha').value = '••••••••';
         document.getElementById('submitLabelJogador').textContent = 'Atualizar Jogador';
         document.getElementById('cancelEditJogador').style.display = 'inline-flex';
         
         // Mostrar aviso da senha antiga
         if (j.senha_hash) {
             document.getElementById('senhaAviso').style.display = 'block';
-            document.getElementById('senhaAtual').textContent = '•••••••• (deixe em branco para manter a atual)';
+            document.getElementById('senhaAtual').textContent = '••••••• (deixe em branco para manter)';
         } else {
             document.getElementById('senhaAviso').style.display = 'none';
         }
