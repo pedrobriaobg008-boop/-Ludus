@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'cookie-session';
+import { v2 as cloudinary } from 'cloudinary';
 
 // Caminho correto das views e public
 const __filename = fileURLToPath(import.meta.url);
@@ -44,6 +45,15 @@ app.use(
   })
 );
 
+// Configurar Cloudinary para uploads em produção
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+}
+
 // Configurar multer para upload de imagens
 // No Vercel (serverless), usar memoryStorage ou serviço externo (S3, Cloudinary)
 const storage = process.env.NODE_ENV === 'production' 
@@ -73,6 +83,25 @@ const upload = multer({
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
 });
+
+// Helper para fazer upload no Cloudinary (usado em produção)
+async function uploadToCloudinary(fileBuffer, originalName) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'ludus-jogos',
+        resource_type: 'image',
+        public_id: 'jogo-' + Date.now(),
+        allowed_formats: ['jpg', 'png', 'gif', 'webp']
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+}
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
@@ -423,7 +452,18 @@ app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) =>
     
     let icone_url = null;
     if (req.file) {
-      icone_url = '/uploads/' + req.file.filename;
+      // Em produção (Vercel), fazer upload para Cloudinary
+      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
+        try {
+          icone_url = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+        } catch (uploadErr) {
+          console.error('Erro no upload Cloudinary:', uploadErr);
+          return res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
+        }
+      } else {
+        // Em desenvolvimento, usar sistema de arquivos local
+        icone_url = '/uploads/' + req.file.filename;
+      }
     }
     
     const jogoData = { 
@@ -464,7 +504,21 @@ app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res)
     if (link_jogar) jogo.link_jogar = link_jogar;
     if (total_niveis) jogo.total_niveis = total_niveis;
     if (xp_maxima) jogo.xp_maxima = xp_maxima;
-    if (req.file) jogo.icone_url = '/uploads/' + req.file.filename;
+    
+    if (req.file) {
+      // Em produção (Vercel), fazer upload para Cloudinary
+      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
+        try {
+          jogo.icone_url = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+        } catch (uploadErr) {
+          console.error('Erro no upload Cloudinary:', uploadErr);
+          return res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
+        }
+      } else {
+        // Em desenvolvimento, usar sistema de arquivos local
+        jogo.icone_url = '/uploads/' + req.file.filename;
+      }
+    }
     
     await jogo.save();
     res.json(jogo);

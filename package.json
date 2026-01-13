@@ -11,8 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cookie-session": "^2.0.0",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.8.0",
+    "cookie-session": "^2.0.0",
     "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
