@@ -110,7 +110,11 @@
                     </div>
                     <div class="field">
                         <label>Senha *</label>
-                        <input type="password" id="senha" required placeholder="Digite uma senha" autocomplete="off">
+                        <div style="position:relative;">
+                            <input type="text" id="senha" placeholder="Digite uma senha" autocomplete="off" style="padding-right:40px;">
+                            <button type="button" onclick="toggleSenha()" style="position:absolute;right:10px;top:36px;background:none;border:none;cursor:pointer;color:#0f172a;font-size:18px;" id="toggleSenhaBtn">👁</button>
+                        </div>
+                        <p id="senhaAviso" style="font-size:12px;color:#64748b;margin-top:4px;display:none;">Senha atual: <code id="senhaAtual" style="background:#f1f5f9;padding:2px 4px;"></code></p>
                     </div>
                 </div>
                 <div class="actions" style="margin-top: 12px;">
@@ -133,7 +137,7 @@
                     <thead>
                     <tr>
                         <th>Turma / Jogador</th>
-                        <th>Login</th>
+                        <th>Senha</th>
                         <th>Data de Criação</th>
                         <th style="width: 200px;">Ações</th>
                     </tr>
@@ -200,7 +204,29 @@
         document.getElementById('jogadorId').value = '';
         document.getElementById('submitLabelJogador').textContent = 'Adicionar Jogador';
         document.getElementById('cancelEditJogador').style.display = 'none';
+        document.getElementById('senhaAviso').style.display = 'none';
+        document.getElementById('senha').type = 'text';
+        document.getElementById('toggleSenhaBtn').textContent = '👁';
     }
+
+    function toggleSenha() {
+        const senhaInput = document.getElementById('senha');
+        const btn = document.getElementById('toggleSenhaBtn');
+        if (senhaInput.type === 'password') {
+            senhaInput.type = 'text';
+            btn.textContent = '🙈';
+        } else {
+            senhaInput.type = 'password';
+            btn.textContent = '👁';
+        }
+    }
+
+    window.adicionarJogadorParaTurma = (turmaId) => {
+        switchTab('jogadores');
+        document.getElementById('turmaSelect').value = turmaId;
+        resetJogadorForm();
+        document.getElementById('nome_jogador').focus();
+    };
 
     async function fetchUsuarios() {
         if (!isAdmin) return;
@@ -279,6 +305,7 @@
                     <td>
                         <div class="actions">
                             <button class="btn btn-ghost btn-sm" onclick='editarTurma(${JSON.stringify(turma)})'>Editar</button>
+                            <button class="btn btn-ghost btn-sm" onclick="adicionarJogadorParaTurma('${turma._id}')">+ Adicionar Jogador</button>
                             <button class="btn btn-danger btn-sm" onclick="removerTurma('${turma._id}')">Remover</button>
                         </div>
                     </td>
@@ -293,7 +320,7 @@
                     html += `
                         <tr>
                             <td style="padding-left:40px;">👤 ${j.nome_jogador || '-'}</td>
-                            <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">${j.login || '—'}</code></td>
+                            <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;">${j.senha_hash ? '••••••••' : '—'}</code></td>
                             <td>${j.createdAt ? new Date(j.createdAt).toLocaleDateString('pt-BR') : '—'}</td>
                             <td>
                                 <div class="actions">
@@ -335,9 +362,18 @@
         document.getElementById('turmaSelect').value = (j.turma && j.turma._id) || '';
         document.getElementById('nome_jogador').value = j.nome_jogador || '';
         document.getElementById('login').value = j.login || '';
-        document.getElementById('senha').value = '';
+        document.getElementById('senha').value = j.senha_hash ? '•••••••' : '';
         document.getElementById('submitLabelJogador').textContent = 'Atualizar Jogador';
         document.getElementById('cancelEditJogador').style.display = 'inline-flex';
+        
+        // Mostrar aviso da senha antiga
+        if (j.senha_hash) {
+            document.getElementById('senhaAviso').style.display = 'block';
+            document.getElementById('senhaAtual').textContent = '•••••••• (deixe em branco para manter a atual)';
+        } else {
+            document.getElementById('senhaAviso').style.display = 'none';
+        }
+        
         document.getElementById('nome_jogador').focus();
     };
 
@@ -379,15 +415,28 @@
     // SUBMIT JOGADOR
     jogadorForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const isEdit = !!document.getElementById('jogadorId').value;
+        const senhaVal = document.getElementById('senha').value.trim();
+        
+        // Em edição, senha vazia significa manter a atual
+        if (isEdit && senhaVal === '•••••••') {
+            // Não enviar senha
+        } else if (!isEdit && !senhaVal) {
+            showMessage('error', 'Preencha a senha para novo jogador.');
+            return;
+        }
+
         const payload = {
             nome_jogador: document.getElementById('nome_jogador').value.trim(),
             turma: document.getElementById('turmaSelect').value,
-            login: document.getElementById('login').value.trim(),
-            senha: document.getElementById('senha').value.trim()
+            login: document.getElementById('login').value.trim()
         };
-        const isEdit = !!document.getElementById('jogadorId').value;
 
-        if (!payload.nome_jogador || !payload.turma || !payload.login || !payload.senha) {
+        if (senhaVal && senhaVal !== '•••••••') {
+            payload.senha = senhaVal;
+        }
+
+        if (!payload.nome_jogador || !payload.turma || !payload.login) {
             showMessage('error', 'Preencha todos os campos obrigatórios.');
             return;
         }
