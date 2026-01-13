@@ -17,6 +17,8 @@ import Usuario from '../models/Usuario.js';
 import Jogo from '../models/Jogo.js';
 import Turma from '../models/Turma.js';
 import Jogador from '../models/Jogador.js';
+import Categoria from '../models/Categoria.js';
+import ConteudoRelacionado from '../models/ConteudoRelacionado.js';
 
 dotenv.config();
 
@@ -54,34 +56,56 @@ if (process.env.CLOUDINARY_URL) {
   });
 }
 
-// Configurar multer para upload de imagens
-// No Vercel (serverless), usar memoryStorage ou serviço externo (S3, Cloudinary)
-const storage = process.env.NODE_ENV === 'production' 
+const isProd = process.env.NODE_ENV === 'production';
+
+// Storages separados para imagem e PDF
+const imageStorage = isProd
   ? multer.memoryStorage()
   : multer.diskStorage({
-      destination: (req, file, cb) => {
+      destination: (_req, _file, cb) => {
         cb(null, join(__dirname, '../public', 'uploads'));
       },
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      filename: (_req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const ext = file.originalname.split('.').pop();
         cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
       }
     });
 
-const fileFilter = (req, file, cb) => {
+const pdfStorage = isProd
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        cb(null, join(__dirname, '../public', 'uploads'));
+      },
+      filename: (_req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = file.originalname.split('.').pop();
+        cb(null, 'conteudo-' + uniqueSuffix + '.' + ext);
+      }
+    });
+
+const imageFileFilter = (_req, file, cb) => {
   const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Apenas imagens são permitidas'), false);
-  }
+  if (allowedMimes.includes(file.mimetype)) return cb(null, true);
+  cb(new Error('Apenas imagens são permitidas'), false);
 };
 
-const upload = multer({ 
-  storage, 
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
+const pdfFileFilter = (_req, file, cb) => {
+  if (file.mimetype === 'application/pdf') return cb(null, true);
+  cb(new Error('Apenas arquivos PDF são permitidos'), false);
+};
+
+const uploadImage = multer({
+  storage: imageStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+const uploadPdf = multer({
+  storage: pdfStorage,
+  fileFilter: pdfFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 // Helper para fazer upload no Cloudinary (usado em produção)
@@ -93,6 +117,25 @@ async function uploadToCloudinary(fileBuffer, originalName) {
         resource_type: 'image',
         public_id: 'jogo-' + Date.now(),
         allowed_formats: ['jpg', 'png', 'gif', 'webp']
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(fileBuffer);
+  });
+}
+
+// Upload de PDF para Cloudinary (resource_type raw)
+async function uploadPdfToCloudinary(fileBuffer) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'ludus-conteudos',
+        resource_type: 'raw',
+        public_id: 'conteudo-' + Date.now(),
+        format: 'pdf'
       },
       (error, result) => {
         if (error) return reject(error);
@@ -218,6 +261,14 @@ const requireAdmin = (req, res, next) => {
 
 const getUserId = (req) => req.session?.user?.id;
 const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) === String(userId);
+const toIdArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return String(value)
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+};
 
 // ============ ROTAS ============
 
@@ -444,10 +495,60 @@ app.delete('/api/usuarios-instituicao/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- Jogos (admin) ----
-app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) => {
+// ---- Categorias de Jogos (admin) ----
+app.post('/api/categorias', requireAdmin, async (req, res) => {
   try {
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy } = req.body;
+    const nome = (req.body.nome || '').trim();
+    if (!nome) return badRequest(res, 'Nome da categoria é obrigatório');
+
+    const exists = await Categoria.findOne({ nome: { $regex: `^${nome}$`, $options: 'i' } });
+    if (exists) return badRequest(res, 'Categoria já existe');
+
+    const nova = await Categoria.create({ nome, createdBy: getUserId(req) });
+    res.status(201).json(nova);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao criar categoria' });
+  }
+});
+
+app.get('/api/categorias', async (_req, res) => {
+  const categorias = await Categoria.find({}).sort({ nome: 1 });
+  res.json(categorias);
+});
+
+app.put('/api/categorias/:id', requireAdmin, async (req, res) => {
+  try {
+    const nome = (req.body.nome || '').trim();
+    if (!nome) return badRequest(res, 'Nome da categoria é obrigatório');
+
+    const categoria = await Categoria.findById(req.params.id);
+    if (!categoria) return notFound(res);
+
+    const exists = await Categoria.findOne({ _id: { $ne: req.params.id }, nome: { $regex: `^${nome}$`, $options: 'i' } });
+    if (exists) return badRequest(res, 'Categoria já existe');
+
+    categoria.nome = nome;
+    await categoria.save();
+    res.json(categoria);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar categoria' });
+  }
+});
+
+app.delete('/api/categorias/:id', requireAdmin, async (req, res) => {
+  const usada = await Jogo.findOne({ categorias: req.params.id });
+  if (usada) return badRequest(res, 'Categoria vinculada a jogos. Remova dos jogos antes.');
+  const deleted = await Categoria.findByIdAndDelete(req.params.id);
+  if (!deleted) return notFound(res);
+  res.json({ ok: true });
+});
+
+// ---- Jogos (admin) ----
+app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, res) => {
+  try {
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
     let icone_url = null;
@@ -477,6 +578,10 @@ app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) =>
     if (link_jogar) jogoData.link_jogar = link_jogar;
     if (total_niveis) jogoData.total_niveis = total_niveis;
     if (xp_maxima) jogoData.xp_maxima = xp_maxima;
+    if (video_demo_url) jogoData.video_demo_url = video_demo_url;
+    if (github_url) jogoData.github_url = github_url;
+    const categoriasArr = toIdArray(categorias);
+    if (categoriasArr.length) jogoData.categorias = categoriasArr;
     
     const jogo = await Jogo.create(jogoData);
     res.status(201).json(jogo);
@@ -487,16 +592,16 @@ app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) =>
 });
 
 app.get('/api/jogos', async (_req, res) => {
-  const jogos = await Jogo.find({});
+  const jogos = await Jogo.find({}).populate('categorias', 'nome');
   res.json(jogos);
 });
 
-app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res) => {
+app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req, res) => {
   try {
     const jogo = await Jogo.findById(req.params.id);
     if (!jogo) return notFound(res);
     
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima } = req.body;
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, categorias, video_demo_url, github_url } = req.body;
     
     if (nome) jogo.nome = nome;
     if (descricao) jogo.descricao = descricao;
@@ -504,6 +609,10 @@ app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res)
     if (link_jogar) jogo.link_jogar = link_jogar;
     if (total_niveis) jogo.total_niveis = total_niveis;
     if (xp_maxima) jogo.xp_maxima = xp_maxima;
+    if (video_demo_url !== undefined) jogo.video_demo_url = video_demo_url || undefined;
+    if (github_url !== undefined) jogo.github_url = github_url || undefined;
+    const categoriasArr = toIdArray(categorias);
+    if (categorias !== undefined) jogo.categorias = categoriasArr;
     
     if (req.file) {
       // Em produção (Vercel), fazer upload para Cloudinary
@@ -530,6 +639,101 @@ app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res)
 
 app.delete('/api/jogos/:id', requireAdmin, async (req, res) => {
   const deleted = await Jogo.findByIdAndDelete(req.params.id);
+  if (!deleted) return notFound(res);
+  res.json({ ok: true });
+});
+
+// ---- Conteúdos Relacionados (admin) ----
+const normalizaTipoConteudo = (tipo) => {
+  if (!tipo) return undefined;
+  const t = String(tipo).trim().toLowerCase();
+  if (t === 'artigo') return 'Artigo';
+  if (t === 'evento') return 'Evento';
+  return undefined;
+};
+
+app.post('/api/conteudos', requireAdmin, uploadPdf.single('arquivo_pdf'), async (req, res) => {
+  try {
+    const { titulo, descricao, link_externo, tag, tipo, jogos } = req.body;
+    if (!titulo || !descricao) return badRequest(res, 'Título e descrição são obrigatórios');
+
+    let pdf_url = null;
+    if (req.file) {
+      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
+        try {
+          pdf_url = await uploadPdfToCloudinary(req.file.buffer);
+        } catch (err) {
+          console.error('Erro no upload PDF Cloudinary:', err);
+          return res.status(500).json({ error: 'Erro ao fazer upload do PDF' });
+        }
+      } else {
+        pdf_url = '/uploads/' + req.file.filename;
+      }
+    }
+
+    const conteudoData = {
+      titulo,
+      descricao,
+      link_externo,
+      tag,
+      tipo: normalizaTipoConteudo(tipo),
+      pdf_url,
+      jogos: toIdArray(jogos),
+      createdBy: getUserId(req)
+    };
+
+    const conteudo = await ConteudoRelacionado.create(conteudoData);
+    res.status(201).json(conteudo);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Erro ao criar conteúdo' });
+  }
+});
+
+app.get('/api/conteudos', async (req, res) => {
+  const filtro = {};
+  if (req.query.jogo) filtro.jogos = req.query.jogo;
+  const conteudos = await ConteudoRelacionado.find(filtro).populate('jogos', 'nome identificacao_unity');
+  res.json(conteudos);
+});
+
+app.put('/api/conteudos/:id', requireAdmin, uploadPdf.single('arquivo_pdf'), async (req, res) => {
+  try {
+    const conteudo = await ConteudoRelacionado.findById(req.params.id);
+    if (!conteudo) return notFound(res);
+
+    const { titulo, descricao, link_externo, tag, tipo, jogos } = req.body;
+
+    if (titulo) conteudo.titulo = titulo;
+    if (descricao) conteudo.descricao = descricao;
+    if (link_externo !== undefined) conteudo.link_externo = link_externo || undefined;
+    if (tag !== undefined) conteudo.tag = tag || undefined;
+    if (tipo !== undefined) conteudo.tipo = normalizaTipoConteudo(tipo);
+    if (jogos !== undefined) conteudo.jogos = toIdArray(jogos);
+
+    if (req.file) {
+      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
+        try {
+          conteudo.pdf_url = await uploadPdfToCloudinary(req.file.buffer);
+        } catch (err) {
+          console.error('Erro no upload PDF Cloudinary:', err);
+          return res.status(500).json({ error: 'Erro ao fazer upload do PDF' });
+        }
+      } else {
+        conteudo.pdf_url = '/uploads/' + req.file.filename;
+      }
+    }
+
+    await conteudo.save();
+    res.json(conteudo);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Erro ao atualizar conteúdo' });
+  }
+});
+
+app.delete('/api/conteudos/:id', requireAdmin, async (req, res) => {
+  const deleted = await ConteudoRelacionado.findByIdAndDelete(req.params.id);
   if (!deleted) return notFound(res);
   res.json({ ok: true });
 });

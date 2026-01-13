@@ -26,6 +26,9 @@
         .alert.error { background:#fef2f2; color:#b91c1c; border:1px solid #fecdd3; }
         .search { margin: -4px 0 10px 0; }
         .search input { width:240px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+        .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#4338ca; font-size:12px; margin:0 4px 4px 0; }
+        .small-note { font-size:12px; color:#94a3b8; margin-top:4px; }
+        .table-wrap { overflow-x:auto; }
         @media (max-width:640px){ .actions{flex-direction:column;} th:nth-child(6),td:nth-child(6){display:none;} }
     </style>
 </head>
@@ -66,6 +69,20 @@
                         <input type="url" id="link_jogar" placeholder="https://...">
                     </div>
                     <div class="field">
+                        <label>Categorias (opcional)</label>
+                        <select id="categoriasSelect" multiple size="4" style="width:100%; min-height:110px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc;">
+                        </select>
+                        <p class="small-note">Use Ctrl/Cmd para selecionar várias</p>
+                    </div>
+                    <div class="field">
+                        <label>Vídeo demonstrativo</label>
+                        <input type="url" id="video_demo_url" placeholder="https://youtube.com/...">
+                    </div>
+                    <div class="field">
+                        <label>Link do GitHub do jogo</label>
+                        <input type="url" id="github_url" placeholder="https://github.com/...">
+                    </div>
+                    <div class="field">
                         <label>Ícone do jogo (imagem)</label>
                         <input type="file" id="icone" accept="image/*">
                         <div id="iconPreview" style="margin-top:8px; display:none;">
@@ -104,25 +121,124 @@
                         <th>Nome</th>
                         <th>Descrição</th>
                         <th>Unity ID</th>
-                        <th>Link</th>
+                        <th>Links</th>
+                        <th>Categorias</th>
                         <th>Ícone</th>
                         <th>Níveis / XP</th>
                         <% if (isAdmin) { %><th style="width:160px;">Ações</th><% } %>
                     </tr>
                     </thead>
                     <tbody id="jogosBody">
-                    <tr><td colspan="<%= isAdmin ? 7 : 6 %>" style="color:#94a3b8;">Carregando...</td></tr>
+                    <tr><td colspan="<%= isAdmin ? 8 : 7 %>" style="color:#94a3b8;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
+
+        <% if (isAdmin) { %>
+        <section class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+                <h3 style="margin:0;">Categorias de Jogos</h3>
+            </div>
+            <form id="categoriaForm" class="grid-2" style="margin-bottom:12px;">
+                <input type="hidden" id="categoriaId">
+                <div class="field">
+                    <label>Nome da categoria *</label>
+                    <input type="text" id="categoriaNome" placeholder="Ex: Matemática">
+                </div>
+                <div class="actions" style="align-items:flex-end;">
+                    <button type="submit" class="btn btn-primary" id="categoriaSubmit">Salvar categoria</button>
+                    <button type="button" class="btn btn-ghost" id="categoriaCancel" style="display:none;">Cancelar</button>
+                </div>
+            </form>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th style="width:140px;">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="categoriasBody">
+                        <tr><td colspan="2" style="color:#94a3b8;">Carregando categorias...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
+                <h3 style="margin:0;">Conteúdos Relacionados</h3>
+                <p class="small-note" style="margin:0;">Cadastre artigos/eventos vinculados aos jogos</p>
+            </div>
+            <form id="conteudoForm">
+                <input type="hidden" id="conteudoId">
+                <div class="grid-2">
+                    <div class="field">
+                        <label>Título *</label>
+                        <input type="text" id="conteudoTitulo" required>
+                    </div>
+                    <div class="field">
+                        <label>Tag (opcional)</label>
+                        <input type="text" id="conteudoTag" placeholder="Ex: IA, Educação">
+                    </div>
+                    <div class="field">
+                        <label>Descrição *</label>
+                        <textarea id="conteudoDescricao" required></textarea>
+                    </div>
+                    <div class="field">
+                        <label>Tipo (opcional)</label>
+                        <select id="conteudoTipo">
+                            <option value="">Selecione</option>
+                            <option value="Artigo">Artigo</option>
+                            <option value="Evento">Evento</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Link externo (opcional)</label>
+                        <input type="url" id="conteudoLink" placeholder="https://...">
+                    </div>
+                    <div class="field">
+                        <label>Arquivo PDF (opcional)</label>
+                        <input type="file" id="conteudoPdf" accept="application/pdf">
+                        <p class="small-note">Se enviar novamente em edição, substitui o arquivo</p>
+                    </div>
+                    <div class="field">
+                        <label>Jogos relacionados (opcional)</label>
+                        <select id="conteudoJogos" multiple size="4" style="width:100%; min-height:110px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc;"></select>
+                        <p class="small-note">Use Ctrl/Cmd para selecionar vários</p>
+                    </div>
+                </div>
+                <div class="actions" style="margin-top:12px;">
+                    <button type="submit" class="btn btn-primary" id="conteudoSubmit">Salvar conteúdo</button>
+                    <button type="button" class="btn btn-ghost" id="conteudoCancel" style="display:none;">Cancelar edição</button>
+                </div>
+            </form>
+            <div class="table-wrap" style="margin-top:12px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Tag / Tipo</th>
+                            <th>Links</th>
+                            <th>Jogos</th>
+                            <th style="width:160px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="conteudosBody">
+                        <tr><td colspan="5" style="color:#94a3b8;">Carregando conteúdos...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <% } %>
     </main>
 </div>
 
 <script>
     const apiBase = '/api/jogos';
     const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
-    const colSpan = isAdmin ? 7 : 6;
+    const colSpan = isAdmin ? 8 : 7;
     const form = document.getElementById('jogoForm');
     const alertBox = document.getElementById('alert');
     const tbody = document.getElementById('jogosBody');
@@ -130,8 +246,33 @@
     const cancelEditBtn = document.getElementById('cancelEdit');
     const submitLabel = document.getElementById('submitLabel');
     const jogoIdInput = document.getElementById('jogoId');
+    const categoriasSelect = document.getElementById('categoriasSelect');
+    const videoInput = document.getElementById('video_demo_url');
+    const githubInput = document.getElementById('github_url');
+
+    // Categorias
+    const categoriaForm = document.getElementById('categoriaForm');
+    const categoriaIdInput = document.getElementById('categoriaId');
+    const categoriaNomeInput = document.getElementById('categoriaNome');
+    const categoriaCancel = document.getElementById('categoriaCancel');
+    const categoriasBody = document.getElementById('categoriasBody');
+
+    // Conteúdos relacionados
+    const conteudoForm = document.getElementById('conteudoForm');
+    const conteudoIdInput = document.getElementById('conteudoId');
+    const conteudoTitulo = document.getElementById('conteudoTitulo');
+    const conteudoDescricao = document.getElementById('conteudoDescricao');
+    const conteudoLink = document.getElementById('conteudoLink');
+    const conteudoTag = document.getElementById('conteudoTag');
+    const conteudoTipo = document.getElementById('conteudoTipo');
+    const conteudoPdf = document.getElementById('conteudoPdf');
+    const conteudoJogos = document.getElementById('conteudoJogos');
+    const conteudoCancel = document.getElementById('conteudoCancel');
+    const conteudosBody = document.getElementById('conteudosBody');
 
     let jogos = [];
+    let categorias = [];
+    let conteudos = [];
 
     function showMessage(type, msg) {
         alertBox.textContent = msg;
@@ -147,6 +288,9 @@
         submitLabel.textContent = 'Salvar';
         cancelEditBtn.style.display = 'none';
         document.getElementById('iconPreview').style.display = 'none';
+        if (categoriasSelect) [...categoriasSelect.options].forEach(opt => opt.selected = false);
+        if (videoInput) videoInput.value = '';
+        if (githubInput) githubInput.value = '';
     }
 
     async function fetchJogos() {
@@ -162,6 +306,7 @@
             jogos = [];
         }
         renderJogos();
+        renderJogosOptions();
     }
 
     function renderJogos() {
@@ -175,12 +320,24 @@
             return;
         }
 
-        tbody.innerHTML = lista.map(j => `
+        tbody.innerHTML = lista.map(j => {
+            const links = [
+                j.link_jogar ? `<a href="${j.link_jogar}" target="_blank">Jogar</a>` : null,
+                j.video_demo_url ? `<a href="${j.video_demo_url}" target="_blank">Vídeo</a>` : null,
+                j.github_url ? `<a href="${j.github_url}" target="_blank">GitHub</a>` : null
+            ].filter(Boolean).join('<br>') || '—';
+
+            const categoriasTxt = (j.categorias && j.categorias.length)
+                ? j.categorias.map(c => c?.nome || '-').join(', ')
+                : '—';
+
+            return `
             <tr>
                 <td>${j.nome || '-'}</td>
                 <td>${j.descricao || '-'}</td>
                 <td>${j.identificacao_unity || '-'}</td>
-                <td>${j.link_jogar ? `<a href="${j.link_jogar}" target="_blank">Abrir</a>` : '—'}</td>
+                <td>${links}</td>
+                <td>${categoriasTxt}</td>
                 <td>
                     ${j.icone_url ? `
                         <img src="${j.icone_url}" 
@@ -193,8 +350,29 @@
                 </td>
                 <td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>
                 ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
+    }
+
+    function setSelectedCategorias(ids = []) {
+        if (!categoriasSelect) return;
+        const set = new Set((ids || []).map(String));
+        [...categoriasSelect.options].forEach(opt => {
+            opt.selected = set.has(opt.value);
+        });
+    }
+
+    function renderJogosOptions() {
+        if (!conteudoJogos) return;
+        conteudoJogos.innerHTML = jogos.map(j => `<option value="${j._id}">${j.nome || j.identificacao_unity || 'Jogo'}</option>`).join('');
+    }
+
+    function setConteudoJogos(ids = []) {
+        if (!conteudoJogos) return;
+        const set = new Set((ids || []).map(String));
+        [...conteudoJogos.options].forEach(opt => {
+            opt.selected = set.has(opt.value);
+        });
     }
 
     window.editarJogo = (j) => {
@@ -205,6 +383,9 @@
         document.getElementById('identificacao_unity').value = j.identificacao_unity || '';
         document.getElementById('link_jogar').value = j.link_jogar || '';
         document.getElementById('icone').value = '';
+        videoInput.value = j.video_demo_url || '';
+        githubInput.value = j.github_url || '';
+        setSelectedCategorias((j.categorias || []).map(c => c._id || c));
         document.getElementById('total_niveis').value = j.total_niveis || '';
         document.getElementById('xp_maxima').value = j.xp_maxima || '';
         
@@ -244,6 +425,12 @@
         formData.append('descricao', descVal);
         formData.append('identificacao_unity', unityVal);
         formData.append('link_jogar', document.getElementById('link_jogar').value.trim());
+        const videoVal = videoInput.value.trim();
+        if (videoVal) formData.append('video_demo_url', videoVal);
+        const githubVal = githubInput.value.trim();
+        if (githubVal) formData.append('github_url', githubVal);
+        const categoriasSelecionadas = categoriasSelect ? [...categoriasSelect.options].filter(o => o.selected).map(o => o.value) : [];
+        categoriasSelecionadas.forEach(id => formData.append('categorias', id));
         
         const totalNiveis = document.getElementById('total_niveis').value.trim();
         if (totalNiveis) formData.append('total_niveis', totalNiveis);
@@ -276,6 +463,209 @@
     });
     }
 
+    // ===== Categorias =====
+    function resetCategoriaForm() {
+        if (!categoriaForm) return;
+        categoriaForm.reset();
+        categoriaIdInput.value = '';
+        categoriaCancel.style.display = 'none';
+        document.getElementById('categoriaSubmit').textContent = 'Salvar categoria';
+    }
+
+    async function fetchCategorias() {
+        if (!categoriasBody) return;
+        categoriasBody.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">Carregando categorias...</td></tr>';
+        try {
+            const res = await fetch('/api/categorias', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Erro ao carregar categorias');
+            categorias = await res.json();
+        } catch (err) {
+            categorias = [];
+            showMessage('error', err.message);
+        }
+        renderCategorias();
+        renderCategoriaOptions();
+    }
+
+    function renderCategoriaOptions() {
+        if (!categoriasSelect) return;
+        categoriasSelect.innerHTML = categorias.map(c => `<option value="${c._id}">${c.nome}</option>`).join('');
+    }
+
+    function renderCategorias() {
+        if (!categoriasBody) return;
+        if (!categorias.length) {
+            categoriasBody.innerHTML = '<tr><td colspan="2" style="color:#94a3b8;">Nenhuma categoria cadastrada.</td></tr>';
+            return;
+        }
+        categoriasBody.innerHTML = categorias.map(c => `
+            <tr>
+                <td>${c.nome}</td>
+                <td><div class="actions"><button class="btn btn-ghost" onclick="editarCategoria('${c._id}')">Editar</button><button class="btn btn-danger" onclick="removerCategoria('${c._id}')">Remover</button></div></td>
+            </tr>
+        `).join('');
+    }
+
+    window.editarCategoria = (id) => {
+        const cat = categorias.find(c => c._id === id);
+        if (!cat) return;
+        categoriaIdInput.value = cat._id;
+        categoriaNomeInput.value = cat.nome;
+        categoriaCancel.style.display = 'inline-flex';
+        document.getElementById('categoriaSubmit').textContent = 'Atualizar';
+    };
+
+    window.removerCategoria = async (id) => {
+        if (!confirm('Remover categoria?')) return;
+        try {
+            const res = await fetch(`/api/categorias/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover categoria');
+            showMessage('success', 'Categoria removida');
+            await fetchCategorias();
+            await fetchJogos();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    if (categoriaForm) {
+        categoriaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = (categoriaNomeInput.value || '').trim();
+            if (!nome) return showMessage('error', 'Informe o nome da categoria');
+            const isEdit = !!categoriaIdInput.value;
+            try {
+                const res = await fetch(isEdit ? `/api/categorias/${categoriaIdInput.value}` : '/api/categorias', {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ nome })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao salvar categoria');
+                showMessage('success', isEdit ? 'Categoria atualizada' : 'Categoria criada');
+                resetCategoriaForm();
+                await fetchCategorias();
+            } catch (err) {
+                showMessage('error', err.message);
+            }
+        });
+        categoriaCancel?.addEventListener('click', resetCategoriaForm);
+    }
+
+    // ===== Conteúdos Relacionados =====
+    function resetConteudoForm() {
+        if (!conteudoForm) return;
+        conteudoForm.reset();
+        conteudoIdInput.value = '';
+        conteudoCancel.style.display = 'none';
+        document.getElementById('conteudoSubmit').textContent = 'Salvar conteúdo';
+        setConteudoJogos([]);
+    }
+
+    async function fetchConteudos() {
+        if (!conteudosBody) return;
+        conteudosBody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Carregando conteúdos...</td></tr>';
+        try {
+            const res = await fetch('/api/conteudos', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Erro ao carregar conteúdos');
+            conteudos = await res.json();
+        } catch (err) {
+            conteudos = [];
+            showMessage('error', err.message);
+        }
+        renderConteudos();
+    }
+
+    function renderConteudos() {
+        if (!conteudosBody) return;
+        if (!conteudos.length) {
+            conteudosBody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Nenhum conteúdo cadastrado.</td></tr>';
+            return;
+        }
+        conteudosBody.innerHTML = conteudos.map(c => {
+            const links = [
+                c.link_externo ? `<a href="${c.link_externo}" target="_blank">Externo</a>` : null,
+                c.pdf_url ? `<a href="${c.pdf_url}" target="_blank">PDF</a>` : null
+            ].filter(Boolean).join('<br>') || '—';
+            const jogosTxt = (c.jogos || []).map(j => j?.nome || j?.identificacao_unity || 'Jogo').join(', ') || '—';
+            const tagTipo = [c.tag, c.tipo].filter(Boolean).join(' / ') || '—';
+            return `
+                <tr>
+                    <td>${c.titulo}</td>
+                    <td>${tagTipo}</td>
+                    <td>${links}</td>
+                    <td>${jogosTxt}</td>
+                    <td><div class="actions"><button class="btn btn-ghost" onclick="editarConteudo('${c._id}')">Editar</button><button class="btn btn-danger" onclick="removerConteudo('${c._id}')">Remover</button></div></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    window.editarConteudo = (id) => {
+        const c = conteudos.find(item => item._id === id);
+        if (!c) return;
+        conteudoIdInput.value = c._id;
+        conteudoTitulo.value = c.titulo || '';
+        conteudoDescricao.value = c.descricao || '';
+        conteudoLink.value = c.link_externo || '';
+        conteudoTag.value = c.tag || '';
+        conteudoTipo.value = c.tipo || '';
+        setConteudoJogos((c.jogos || []).map(j => j?._id || j));
+        conteudoCancel.style.display = 'inline-flex';
+        document.getElementById('conteudoSubmit').textContent = 'Atualizar conteúdo';
+    };
+
+    window.removerConteudo = async (id) => {
+        if (!confirm('Remover conteúdo?')) return;
+        try {
+            const res = await fetch(`/api/conteudos/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao remover conteúdo');
+            showMessage('success', 'Conteúdo removido');
+            await fetchConteudos();
+        } catch (err) {
+            showMessage('error', err.message);
+        }
+    };
+
+    if (conteudoForm) {
+        conteudoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const titulo = conteudoTitulo.value.trim();
+            const descricao = conteudoDescricao.value.trim();
+            if (!titulo || !descricao) return showMessage('error', 'Título e descrição são obrigatórios');
+
+            const formData = new FormData();
+            formData.append('titulo', titulo);
+            formData.append('descricao', descricao);
+            if (conteudoLink.value.trim()) formData.append('link_externo', conteudoLink.value.trim());
+            if (conteudoTag.value.trim()) formData.append('tag', conteudoTag.value.trim());
+            if (conteudoTipo.value) formData.append('tipo', conteudoTipo.value);
+            const jogosSelecionados = conteudoJogos ? [...conteudoJogos.options].filter(o => o.selected).map(o => o.value) : [];
+            jogosSelecionados.forEach(id => formData.append('jogos', id));
+            if (conteudoPdf.files.length > 0) formData.append('arquivo_pdf', conteudoPdf.files[0]);
+
+            const isEdit = !!conteudoIdInput.value;
+            try {
+                const res = await fetch(isEdit ? `/api/conteudos/${conteudoIdInput.value}` : '/api/conteudos', {
+                    method: isEdit ? 'PUT' : 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Erro ao salvar conteúdo');
+                showMessage('success', isEdit ? 'Conteúdo atualizado' : 'Conteúdo criado');
+                resetConteudoForm();
+                fetchConteudos();
+            } catch (err) {
+                showMessage('error', err.message);
+            }
+        });
+        conteudoCancel?.addEventListener('click', resetConteudoForm);
+    }
+
     window.removerJogo = async (id) => {
         if (!isAdmin) return;
         if (!confirm('Remover este jogo?')) return;
@@ -290,7 +680,14 @@
         }
     };
 
-    fetchJogos();
+    // Inicialização
+    if (isAdmin) {
+        fetchCategorias()
+            .then(() => fetchJogos())
+            .then(() => fetchConteudos());
+    } else {
+        fetchJogos();
+    }
 </script>
 </body>
 </html>
