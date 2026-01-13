@@ -30,6 +30,8 @@ app.set('view engine', 'ejs');
 
 // Servir arquivos estáticos
 app.use(express.static(join(__dirname, 'public')));
+// Rota explícita para uploads (adicional)
+app.use('/uploads', express.static(join(__dirname, 'public', 'uploads')));
 app.set('views', join(__dirname, 'views'));
 
 // Sessões baseadas em cookie
