@@ -110,11 +110,8 @@
                     </div>
                     <div class="field">
                         <label>Senha *</label>
-                        <div style="position:relative;">
-                            <input type="text" id="senha" placeholder="Digite uma senha" autocomplete="off" style="padding-right:40px;">
-                            <button type="button" onclick="toggleSenha()" style="position:absolute;right:10px;top:36px;background:none;border:none;cursor:pointer;color:#0f172a;font-size:18px;" id="toggleSenhaBtn">👁</button>
-                        </div>
-                        <p id="senhaAviso" style="font-size:12px;color:#64748b;margin-top:4px;display:none;">Senha atual: <code id="senhaAtual" style="background:#f1f5f9;padding:2px 4px;"></code></p>
+                        <input type="text" id="senha" placeholder="Digite uma senha" autocomplete="off">
+                        <p id="senhaAviso" style="font-size:12px;color:#64748b;margin-top:4px;display:none;">Deixe em branco para manter a senha atual</p>
                     </div>
                 </div>
                 <div class="actions" style="margin-top: 12px;">
@@ -199,27 +196,16 @@
     }
 
     function resetJogadorForm() {
+        // Salvar turma selecionada antes de limpar
+        const turmaSelecionada = document.getElementById('turmaSelect').value;
         jogadorForm.reset();
+        // Restaurar turma selecionada
+        document.getElementById('turmaSelect').value = turmaSelecionada;
         document.getElementById('jogadorId').value = '';
         document.getElementById('submitLabelJogador').textContent = 'Adicionar Jogador';
         document.getElementById('cancelEditJogador').style.display = 'none';
         document.getElementById('senhaAviso').style.display = 'none';
-        document.getElementById('senha').type = 'text';
-        document.getElementById('toggleSenhaBtn').textContent = '👁';
-        // NÃO limpar turmaSelect - deixar pré-selecionada para adicionar em lote
         document.getElementById('nome_jogador').focus();
-    }
-
-    function toggleSenha() {
-        const senhaInput = document.getElementById('senha');
-        const btn = document.getElementById('toggleSenhaBtn');
-        if (senhaInput.type === 'password') {
-            senhaInput.type = 'text';
-            btn.textContent = '🙈';
-        } else {
-            senhaInput.type = 'password';
-            btn.textContent = '👁';
-        }
     }
 
     window.adicionarJogadorParaTurma = (turmaId) => {
@@ -361,18 +347,16 @@
         document.getElementById('turmaSelect').value = (j.turma && j.turma._id) || '';
         document.getElementById('nome_jogador').value = j.nome_jogador || '';
         document.getElementById('login').value = j.login || '';
-        document.getElementById('senha').value = '••••••••';
-        document.getElementById('submitLabelJogador').textContent = 'Atualizar Jogador';
-        document.getElementById('cancelEditJogador').style.display = 'inline-flex';
-        
-        // Mostrar aviso da senha antiga
+        // Mostrar que há uma senha existente
         if (j.senha_hash) {
+            document.getElementById('senha').value = '';
             document.getElementById('senhaAviso').style.display = 'block';
-            document.getElementById('senhaAtual').textContent = '••••••• (deixe em branco para manter)';
         } else {
+            document.getElementById('senha').value = '';
             document.getElementById('senhaAviso').style.display = 'none';
         }
-        
+        document.getElementById('submitLabelJogador').textContent = 'Atualizar Jogador';
+        document.getElementById('cancelEditJogador').style.display = 'inline-flex';
         document.getElementById('nome_jogador').focus();
     };
 
@@ -418,9 +402,7 @@
         const senhaVal = document.getElementById('senha').value.trim();
         
         // Em edição, senha vazia significa manter a atual
-        if (isEdit && senhaVal === '•••••••') {
-            // Não enviar senha
-        } else if (!isEdit && !senhaVal) {
+        if (!isEdit && !senhaVal) {
             showMessage('error', 'Preencha a senha para novo jogador.');
             return;
         }
@@ -431,7 +413,8 @@
             login: document.getElementById('login').value.trim()
         };
 
-        if (senhaVal && senhaVal !== '•••••••') {
+        // Enviar senha apenas se preenchida
+        if (senhaVal) {
             payload.senha = senhaVal;
         }
 
