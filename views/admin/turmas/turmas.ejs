@@ -348,8 +348,8 @@
         document.getElementById('nome_jogador').value = j.nome_jogador || '';
         document.getElementById('login').value = j.login || '';
         // Mostrar que há uma senha existente
-        if (j.senha_hash) {
-            document.getElementById('senha').value = '';
+        if (j.senha_visivel) {
+            document.getElementById('senha').value = j.senha_visivel;
             document.getElementById('senhaAviso').style.display = 'block';
         } else {
             document.getElementById('senha').value = '';
