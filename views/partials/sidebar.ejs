@@ -3,30 +3,53 @@
         <img src="/logo-ludus.png" alt="Ludus Logo">
     </div>
     <nav class="menu">
+        <% 
+            const isAdmin = currentUser && (
+                Array.isArray(currentUser.perfil) 
+                    ? currentUser.perfil.some(p => {
+                        const n = (p || '').toString().toLowerCase().trim();
+                        return n === 'admin' || n === 'administrador' || n === 'adm';
+                    })
+                    : (() => {
+                        const n = (currentUser.perfil || '').toString().toLowerCase().trim();
+                        return n === 'admin' || n === 'administrador' || n === 'adm';
+                    })()
+            );
+        %>
+        <% if (isAdmin) { %>
         <a href="/ocorrencias" class="menu-item">
             <span class="menu-icon">📋</span>
             Ocorrências
         </a>
+        <% } %>
+        <% if (isAdmin) { %>
         <a href="/aulas" class="menu-item">
             <span class="menu-icon">📖</span>
             Aulas
         </a>
+        <% } %>
         <a href="/turmas" class="menu-item">
             <span class="menu-icon">👥</span>
             Turmas
         </a>
+        <% if (isAdmin) { %>
         <a href="#" class="menu-item">
             <span class="menu-icon">📅</span>
             Calendário
         </a>
+        <% } %>
+        <% if (isAdmin) { %>
         <a href="#" class="menu-item">
             <span class="menu-icon">📊</span>
             Relatórios
         </a>
+        <% } %>
+        <% if (isAdmin) { %>
         <a href="#" class="menu-item">
             <span class="menu-icon">📈</span>
             Gráficos de comportamento
         </a>
+        <% } %>
         <a href="/mapeamento" class="menu-item">
             <span class="menu-icon">🎮</span>
             Mapear Jogo
@@ -35,10 +58,12 @@
             <span class="menu-icon">👤</span>
             Usuário
         </a>
+        <% if (isAdmin) { %>
         <a href="#" class="menu-item">
             <span class="menu-icon">⚙️</span>
             Configurações
         </a>
+        <% } %>
         <a href="/logout" class="menu-item">
             <span class="menu-icon">🚪</span>
             Sair
