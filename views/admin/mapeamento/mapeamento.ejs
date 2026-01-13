@@ -156,6 +156,7 @@
             if (!res.ok) throw new Error('Erro ao carregar jogos');
             const data = await res.json();
             jogos = data || [];
+            console.log('Jogos carregados:', jogos); // Debug - verificar icone_url
         } catch (err) {
             showMessage('error', err.message);
             jogos = [];
@@ -180,7 +181,16 @@
                 <td>${j.descricao || '-'}</td>
                 <td>${j.identificacao_unity || '-'}</td>
                 <td>${j.link_jogar ? `<a href="${j.link_jogar}" target="_blank">Abrir</a>` : '—'}</td>
-                <td>${j.icone_url ? `<img src="${j.icone_url}" alt="icone" style="width:32px;height:32px;border-radius:6px;">` : '—'}</td>
+                <td>
+                    ${j.icone_url ? `
+                        <img src="${j.icone_url}" 
+                             alt="ícone do jogo" 
+                             title="${j.icone_url}"
+                             style="width:32px;height:32px;border-radius:6px;object-fit:cover;" 
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">
+                        <span style="display:none;font-size:11px;color:#dc2626;">❌ Erro ao carregar</span>
+                    ` : '<span style="font-size:11px;color:#94a3b8;">Sem imagem</span>'}
+                </td>
                 <td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>
                 ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
             </tr>
@@ -255,6 +265,7 @@
                 credentials: 'same-origin'
             });
             const data = await res.json();
+            console.log('Resposta da API:', data); // Debug
             if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
             showMessage('success', isEdit ? 'Jogo atualizado' : 'Jogo criado');
             resetForm();
