@@ -177,6 +177,7 @@ const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) 
 
 // ==== VIEWS (mantidas) ====
 app.get('/', (req, res) => {
+  if (req.session?.user) return res.redirect('/home');
   res.render('auth/login', { title: 'Ludus - Login' });
 });
 
@@ -203,7 +204,7 @@ app.post('/login', async (req, res) => {
       instituicao_usuario: user.instituicao_usuario,
       perfil: user.perfil || [],
     };
-    return res.redirect('/ocorrencias');
+    return res.redirect('/home');
   } catch (err) {
     console.error(err);
     return res.status(500).render('auth/login', { title: 'Ludus - Login', error: 'Erro no servidor.' });
@@ -213,6 +214,10 @@ app.post('/login', async (req, res) => {
 app.get('/logout', (req, res) => {
   req.session = null;
   res.redirect('/');
+});
+
+app.get('/home', requireAuthView, (req, res) => {
+  res.render('admin/home', { title: 'Home - Ludus' });
 });
 
 app.get('/ocorrencias', requireAuthView, (req, res) => {

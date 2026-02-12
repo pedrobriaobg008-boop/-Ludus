@@ -275,6 +275,7 @@ const toIdArray = (value) => {
 // ==== VIEWS ====
 app.get('/', (req, res) => {
   try {
+    if (req.session?.user) return res.redirect('/home');
     res.render('auth/login', { title: 'Ludus - Login' });
   } catch (err) {
     console.error('Erro ao renderizar login:', err);
@@ -316,7 +317,7 @@ app.post('/login', async (req, res) => {
     };
     
     console.log('Login bem-sucedido:', email);
-    return res.redirect('/ocorrencias');
+    return res.redirect('/home');
   } catch (err) {
     console.error('Erro no login:', err);
     return res.status(500).render('auth/login', { title: 'Ludus - Login', error: 'Erro no servidor: ' + err.message });
@@ -326,6 +327,10 @@ app.post('/login', async (req, res) => {
 app.get('/logout', (req, res) => {
   req.session = null;
   res.redirect('/');
+});
+
+app.get('/home', requireAuthView, (req, res) => {
+  res.render('admin/home', { title: 'Home - Ludus' });
 });
 
 app.get('/ocorrencias', requireAuthView, (req, res) => {

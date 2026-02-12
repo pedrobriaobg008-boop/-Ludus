@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home • Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <%- include('../partials/sidebar') %>
+        <main class="main-content">
+            <h1>Home</h1>
+            <p>Olá, <strong><%= currentUser?.nome_usuario || 'Usuário' %></strong>! Bem-vindo ao Ludus.</p>
+            <p>Escolha uma opção no menu para começar.</p>
+            <div class="stats">
+                <p><strong>Dica rápida:</strong> cadastre turmas e mapeie jogos para organizar suas atividades.</p>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
