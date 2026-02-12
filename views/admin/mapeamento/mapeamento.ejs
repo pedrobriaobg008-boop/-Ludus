@@ -120,16 +120,20 @@
                     <tr>
                         <th>Nome</th>
                         <th>Descrição</th>
+                        <% if (isAdmin) { %>
                         <th>Unity ID</th>
+                        <% } %>
                         <th>Links</th>
                         <th>Categorias</th>
                         <th>Ícone</th>
+                        <% if (isAdmin) { %>
                         <th>Níveis / XP</th>
-                        <% if (isAdmin) { %><th style="width:160px;">Ações</th><% } %>
+                        <th style="width:160px;">Ações</th>
+                        <% } %>
                     </tr>
                     </thead>
                     <tbody id="jogosBody">
-                    <tr><td colspan="<%= isAdmin ? 8 : 7 %>" style="color:#94a3b8;">Carregando...</td></tr>
+                    <tr><td colspan="<%= isAdmin ? 8 : 5 %>" style="color:#94a3b8;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -238,7 +242,7 @@
 <script>
     const apiBase = '/api/jogos';
     const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
-    const colSpan = isAdmin ? 8 : 7;
+    const colSpan = isAdmin ? 8 : 5;
     const form = document.getElementById('jogoForm');
     const alertBox = document.getElementById('alert');
     const tbody = document.getElementById('jogosBody');
@@ -316,7 +320,7 @@
             : jogos;
 
         if (!lista.length) {
-            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 7 : 6}" style="color:#94a3b8;">Nenhum jogo cadastrado.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 : 5}" style="color:#94a3b8;">Nenhum jogo cadastrado.</td></tr>`;
             return;
         }
 
@@ -324,7 +328,7 @@
             const links = [
                 j.link_jogar ? `<a href="${j.link_jogar}" target="_blank">Jogar</a>` : null,
                 j.video_demo_url ? `<a href="${j.video_demo_url}" target="_blank">Vídeo</a>` : null,
-                j.github_url ? `<a href="${j.github_url}" target="_blank">GitHub</a>` : null
+                isAdmin && j.github_url ? `<a href="${j.github_url}" target="_blank">GitHub</a>` : null
             ].filter(Boolean).join('<br>') || '—';
 
             const categoriasTxt = (j.categorias && j.categorias.length)
@@ -335,7 +339,7 @@
             <tr>
                 <td>${j.nome || '-'}</td>
                 <td>${j.descricao || '-'}</td>
-                <td>${j.identificacao_unity || '-'}</td>
+                ${isAdmin ? `<td>${j.identificacao_unity || '-'}</td>` : ''}
                 <td>${links}</td>
                 <td>${categoriasTxt}</td>
                 <td>
@@ -348,7 +352,7 @@
                         <span style="display:none;font-size:11px;color:#dc2626;">❌ Erro ao carregar</span>
                     ` : '<span style="font-size:11px;color:#94a3b8;">Sem imagem</span>'}
                 </td>
-                <td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>
+                ${isAdmin ? `<td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>` : ''}
                 ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
             </tr>`;
         }).join('');
