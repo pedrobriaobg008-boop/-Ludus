@@ -14,6 +14,7 @@ const __dirname = dirname(__filename);
 // Models
 import Usuario from './models/Usuario.js';
 import Jogo from './models/Jogo.js';
+import Categoria from './models/Categoria.js';
 import Turma from './models/Turma.js';
 import Jogador from './models/Jogador.js';
 
@@ -353,7 +354,7 @@ app.delete('/api/usuarios-instituicao/:id', requireAdmin, async (req, res) => {
 // ---- Jogos (admin) ----
 app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) => {
   try {
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy } = req.body;
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
     let icone_url = null;
@@ -373,6 +374,12 @@ app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) =>
     if (total_niveis) jogoData.total_niveis = total_niveis;
     if (xp_maxima) jogoData.xp_maxima = xp_maxima;
     
+    // Adicionar categorias se fornecidas
+    if (categorias) {
+      const categoriasArray = Array.isArray(categorias) ? categorias : (categorias ? [categorias] : []);
+      jogoData.categorias = categoriasArray.filter(id => id && String(id).trim().length > 0);
+    }
+    
     const jogo = await Jogo.create(jogoData);
     res.status(201).json(jogo);
   } catch (err) {
@@ -391,7 +398,7 @@ app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res)
     const jogo = await Jogo.findById(req.params.id);
     if (!jogo) return notFound(res);
     
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima } = req.body;
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, categorias } = req.body;
     
     if (nome) jogo.nome = nome;
     if (descricao) jogo.descricao = descricao;
@@ -400,6 +407,12 @@ app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res)
     if (total_niveis) jogo.total_niveis = total_niveis;
     if (xp_maxima) jogo.xp_maxima = xp_maxima;
     if (req.file) jogo.icone_url = '/uploads/' + req.file.filename;
+    
+    // Atualizar categorias se fornecidas
+    if (categorias) {
+      const categoriasArray = Array.isArray(categorias) ? categorias : (categorias ? [categorias] : []);
+      jogo.categorias = categoriasArray.filter(id => id && String(id).trim().length > 0);
+    }
     
     await jogo.save();
     res.json(jogo);
@@ -413,6 +426,75 @@ app.delete('/api/jogos/:id', requireAdmin, async (req, res) => {
   const deleted = await Jogo.findByIdAndDelete(req.params.id);
   if (!deleted) return notFound(res);
   res.json({ ok: true });
+});
+
+// ---- Categorias (admin) ----
+app.post('/api/categorias', requireAdmin, async (req, res) => {
+  try {
+    const { nome } = req.body;
+    if (!nome || !nome.trim()) return badRequest(res, 'Nome da categoria é obrigatório');
+    
+    const existe = await Categoria.findOne({ nome: nome.trim() });
+    if (existe) return badRequest(res, 'Categoria já existe');
+    
+    const categoria = await Categoria.create({
+      nome: nome.trim(),
+      createdBy: getUserId(req)
+    });
+    res.status(201).json(categoria);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Erro ao criar categoria' });
+  }
+});
+
+app.get('/api/categorias', async (_req, res) => {
+  try {
+    const categorias = await Categoria.find({}).sort({ nome: 1 });
+    res.json(categorias);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar categorias' });
+  }
+});
+
+app.put('/api/categorias/:id', requireAdmin, async (req, res) => {
+  try {
+    const categoria = await Categoria.findById(req.params.id);
+    if (!categoria) return notFound(res, 'Categoria não encontrada');
+    
+    const { nome } = req.body;
+    if (!nome || !nome.trim()) return badRequest(res, 'Nome da categoria é obrigatório');
+    
+    // Verificar se outro já tem esse nome
+    const existe = await Categoria.findOne({ nome: nome.trim(), _id: { $ne: req.params.id } });
+    if (existe) return badRequest(res, 'Categoria com esse nome já existe');
+    
+    categoria.nome = nome.trim();
+    await categoria.save();
+    res.json(categoria);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao atualizar categoria' });
+  }
+});
+
+app.delete('/api/categorias/:id', requireAdmin, async (req, res) => {
+  try {
+    const categoria = await Categoria.findByIdAndDelete(req.params.id);
+    if (!categoria) return notFound(res, 'Categoria não encontrada');
+    
+    // Remover referência desta categoria de todos os jogos
+    await Jogo.updateMany(
+      { categorias: req.params.id },
+      { $pull: { categorias: req.params.id } }
+    );
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao deletar categoria' });
+  }
 });
 
 // ---- Turmas (admin ou instituição) ----
