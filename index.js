@@ -389,8 +389,13 @@ app.post('/api/jogos', requireAdmin, upload.single('icone'), async (req, res) =>
 });
 
 app.get('/api/jogos', async (_req, res) => {
-  const jogos = await Jogo.find({});
-  res.json(jogos);
+  try {
+    const jogos = await Jogo.find({}).populate('categorias');
+    res.json(jogos);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar jogos' });
+  }
 });
 
 app.put('/api/jogos/:id', requireAdmin, upload.single('icone'), async (req, res) => {
