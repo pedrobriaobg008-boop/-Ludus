@@ -6,7 +6,6 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'cookie-session';
-import { v2 as cloudinary } from 'cloudinary';
 
 // Caminho correto das views e public
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +19,10 @@ import Jogador from '../models/Jogador.js';
 import Categoria from '../models/Categoria.js';
 import ConteudoRelacionado from '../models/ConteudoRelacionado.js';
 
-dotenv.config();
+// GridFS
+// Nota: migração para armazenamento em documento (Buffer). GridFS removido.
+
+dotenv.config({ override: true, path: join(__dirname, '../.env') });
 
 const app = express();
 
@@ -47,43 +49,9 @@ app.use(
   })
 );
 
-// Configurar Cloudinary para uploads em produção
-if (process.env.CLOUDINARY_URL) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
-}
-
-const isProd = process.env.NODE_ENV === 'production';
-
-// Storages separados para imagem e PDF
-const imageStorage = isProd
-  ? multer.memoryStorage()
-  : multer.diskStorage({
-      destination: (_req, _file, cb) => {
-        cb(null, join(__dirname, '../public', 'uploads'));
-      },
-      filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const ext = file.originalname.split('.').pop();
-        cb(null, 'jogo-' + uniqueSuffix + '.' + ext);
-      }
-    });
-
-const pdfStorage = isProd
-  ? multer.memoryStorage()
-  : multer.diskStorage({
-      destination: (_req, _file, cb) => {
-        cb(null, join(__dirname, '../public', 'uploads'));
-      },
-      filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const ext = file.originalname.split('.').pop();
-        cb(null, 'conteudo-' + uniqueSuffix + '.' + ext);
-      }
-    });
+// Storages em memória para enviar direto ao GridFS
+const imageStorage = multer.memoryStorage();
+const pdfStorage = multer.memoryStorage();
 
 const imageFileFilter = (_req, file, cb) => {
   const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -107,44 +75,6 @@ const uploadPdf = multer({
   fileFilter: pdfFileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }
 });
-
-// Helper para fazer upload no Cloudinary (usado em produção)
-async function uploadToCloudinary(fileBuffer, originalName) {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'ludus-jogos',
-        resource_type: 'image',
-        public_id: 'jogo-' + Date.now(),
-        allowed_formats: ['jpg', 'png', 'gif', 'webp']
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url);
-      }
-    );
-    uploadStream.end(fileBuffer);
-  });
-}
-
-// Upload de PDF para Cloudinary (resource_type raw)
-async function uploadPdfToCloudinary(fileBuffer) {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'ludus-conteudos',
-        resource_type: 'raw',
-        public_id: 'conteudo-' + Date.now(),
-        format: 'pdf'
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url);
-      }
-    );
-    uploadStream.end(fileBuffer);
-  });
-}
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
@@ -271,6 +201,33 @@ const toIdArray = (value) => {
 };
 
 // ============ ROTAS ============
+
+// Nota: rota `/media/jogo/:id` removida — imagens agora são servidas como data URLs
+
+app.get('/api/conteudos/:id/pdf', requireAuthApi, async (req, res) => {
+  try {
+    await connectDB();
+    const conteudo = await ConteudoRelacionado.findById(req.params.id);
+
+    if (!conteudo) return notFound(res, 'Conteúdo não encontrado');
+
+    // Preferir PDF armazenado no documento
+    if (conteudo.pdf && conteudo.pdf.length) {
+      const mime = conteudo.pdf_mime || 'application/pdf';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `inline; filename="${conteudo.titulo || 'conteudo'}.pdf"`);
+      return res.send(conteudo.pdf);
+    }
+
+    // Fallback para URL externa
+    if (conteudo.pdf_url) return res.redirect(conteudo.pdf_url);
+
+    return res.status(404).send('PDF não disponível');
+  } catch (error) {
+    console.error('Erro ao servir PDF:', error);
+    res.status(500).send('Erro ao carregar PDF');
+  }
+});
 
 // ==== VIEWS ====
 app.get('/', (req, res) => {
@@ -556,29 +513,13 @@ app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, re
     const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
-    let icone_url = null;
+    const jogoData = { nome, descricao, identificacao_unity, createdBy };
     if (req.file) {
-      // Em produção (Vercel), fazer upload para Cloudinary
-      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
-        try {
-          icone_url = await uploadToCloudinary(req.file.buffer, req.file.originalname);
-        } catch (uploadErr) {
-          console.error('Erro no upload Cloudinary:', uploadErr);
-          return res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
-        }
-      } else {
-        // Em desenvolvimento, usar sistema de arquivos local
-        icone_url = '/uploads/' + req.file.filename;
-      }
+      // Salva o buffer diretamente no documento e gera data URL para o front
+      jogoData.icone = req.file.buffer;
+      jogoData.icone_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      jogoData.icone_id = null;
     }
-    
-    const jogoData = { 
-      nome, 
-      descricao, 
-      identificacao_unity, 
-      icone_url,
-      createdBy 
-    };
     
     if (link_jogar) jogoData.link_jogar = link_jogar;
     if (total_niveis) jogoData.total_niveis = total_niveis;
@@ -620,18 +561,10 @@ app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req,
     if (categorias !== undefined) jogo.categorias = categoriasArr;
     
     if (req.file) {
-      // Em produção (Vercel), fazer upload para Cloudinary
-      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
-        try {
-          jogo.icone_url = await uploadToCloudinary(req.file.buffer, req.file.originalname);
-        } catch (uploadErr) {
-          console.error('Erro no upload Cloudinary:', uploadErr);
-          return res.status(500).json({ error: 'Erro ao fazer upload da imagem' });
-        }
-      } else {
-        // Em desenvolvimento, usar sistema de arquivos local
-        jogo.icone_url = '/uploads/' + req.file.filename;
-      }
+      // Salva buffer direto no documento e atualiza icone_url com data URL
+      jogo.icone = req.file.buffer;
+      jogo.icone_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      jogo.icone_id = null;
     }
     
     await jogo.save();
@@ -662,27 +595,16 @@ app.post('/api/conteudos', requireAdmin, uploadPdf.single('arquivo_pdf'), async 
     const { titulo, descricao, link_externo, tag, tipo, jogos } = req.body;
     if (!titulo || !descricao) return badRequest(res, 'Título e descrição são obrigatórios');
 
-    let pdf_url = null;
-    if (req.file) {
-      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
-        try {
-          pdf_url = await uploadPdfToCloudinary(req.file.buffer);
-        } catch (err) {
-          console.error('Erro no upload PDF Cloudinary:', err);
-          return res.status(500).json({ error: 'Erro ao fazer upload do PDF' });
-        }
-      } else {
-        pdf_url = '/uploads/' + req.file.filename;
-      }
-    }
-
     const conteudoData = {
       titulo,
       descricao,
       link_externo,
       tag,
       tipo: normalizaTipoConteudo(tipo),
-      pdf_url,
+      pdf: req.file ? req.file.buffer : undefined,
+      pdf_mime: req.file ? req.file.mimetype : undefined,
+      pdf_id: null,
+      pdf_url: null,
       jogos: toIdArray(jogos),
       createdBy: getUserId(req)
     };
@@ -717,16 +639,11 @@ app.put('/api/conteudos/:id', requireAdmin, uploadPdf.single('arquivo_pdf'), asy
     if (jogos !== undefined) conteudo.jogos = toIdArray(jogos);
 
     if (req.file) {
-      if (process.env.NODE_ENV === 'production' && process.env.CLOUDINARY_URL) {
-        try {
-          conteudo.pdf_url = await uploadPdfToCloudinary(req.file.buffer);
-        } catch (err) {
-          console.error('Erro no upload PDF Cloudinary:', err);
-          return res.status(500).json({ error: 'Erro ao fazer upload do PDF' });
-        }
-      } else {
-        conteudo.pdf_url = '/uploads/' + req.file.filename;
-      }
+      // Substituir PDF armazenado no documento
+      conteudo.pdf = req.file.buffer;
+      conteudo.pdf_mime = req.file.mimetype;
+      conteudo.pdf_id = null;
+      conteudo.pdf_url = null;
     }
 
     await conteudo.save();
@@ -738,9 +655,22 @@ app.put('/api/conteudos/:id', requireAdmin, uploadPdf.single('arquivo_pdf'), asy
 });
 
 app.delete('/api/conteudos/:id', requireAdmin, async (req, res) => {
-  const deleted = await ConteudoRelacionado.findByIdAndDelete(req.params.id);
-  if (!deleted) return notFound(res);
-  res.json({ ok: true });
+  try {
+    const conteudo = await ConteudoRelacionado.findById(req.params.id);
+    if (!conteudo) return notFound(res);
+
+    // Limpar referências internas de PDF
+    conteudo.pdf = undefined;
+    conteudo.pdf_mime = undefined;
+    conteudo.pdf_id = null;
+
+    const deleted = await ConteudoRelacionado.findByIdAndDelete(req.params.id);
+    if (!deleted) return notFound(res);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---- Turmas (admin ou instituição) ----
@@ -890,3 +820,12 @@ app.delete('/api/jogadores/:id', async (req, res) => {
 
 // Exporta o handler compatível com Vercel
 export default app;
+
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectRun) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`✓ Servidor admin rodando em http://localhost:${PORT}`);
+  });
+}

@@ -37,12 +37,9 @@ NODE_ENV=production
 
 ### Limitações no Vercel (Serverless)
 
-⚠️ **Uploads de imagens**: 
-- Em produção, uploads são armazenados em memória (temporário)
-- Para persistência, use serviços externos como:
-  - Cloudinary
-  - AWS S3
-  - Vercel Blob Storage
+⚠️ **Uploads de arquivos**:
+- Em produção, uploads são armazenados em memória (temporário) por limitações serverless.
+- Neste projeto é possível armazenar imagens diretamente como `Buffer` em documentos MongoDB (adequado para arquivos pequenos). Para arquivos maiores, prefira S3 ou Blob Storage.
 
 ⚠️ **Sessões**:
 - Sessões em memória funcionam mas podem ser perdidas
