@@ -37,7 +37,8 @@
       </div>
       <div>
         <label>Tag (opcional)</label>
-        <input name="tag" />
+        <input name="tag" list="tagSuggestions" />
+        <datalist id="tagSuggestions"></datalist>
       </div>
       <div>
         <label>Jogos (IDs separados por vírgula)</label>
@@ -65,27 +66,24 @@ async function loadList(){
   const res = await fetch('/api/conteudos', { credentials: 'same-origin' });
   const items = await res.json();
   const root = document.getElementById('list');
+  const tagSuggestions = document.getElementById('tagSuggestions');
   root.innerHTML = '';
   if(!items.length) { root.innerHTML = '<p>Nenhum conteúdo cadastrado.</p>'; return; }
+  const uniqueTags = Array.from(new Set(items.map(item => (item.tag || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  tagSuggestions.innerHTML = uniqueTags.map(tag => `<option value="${tag.replace(/"/g, '&quot;')}"></option>`).join('');
   const table = document.createElement('table');
   table.border = 1;
   const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>Título</th><th>Tipo</th><th>Link</th><th>Jogos</th><th>Ações</th></tr>';
+  thead.innerHTML = '<tr><th>Título</th><th>Tipo</th><th>Link</th><th>Arquivo</th><th>Jogos</th><th>Ações</th></tr>';
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
   for(const it of items){
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${it.link_externo||''}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
+    const hasPdf = Boolean(it.pdf_url || it.pdf_id || it.pdf);
+    const externalLinkHtml = it.link_externo ? `<a href="${it.link_externo}" target="_blank" rel="noopener noreferrer">Abrir URL</a>` : '';
+    const pdfLinkHtml = hasPdf ? `<a href="/conteudo/public/pdf/${it._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo</a>` : '';
+    tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${externalLinkHtml}</td><td>${pdfLinkHtml}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
     const actions = tr.querySelector('td:last-child');
-    if (it.pdf_url || it.pdf_id || it.pdf) {
-      const pdfBtn = document.createElement('a');
-      pdfBtn.textContent = 'Visualizar PDF';
-      pdfBtn.href = `/conteudo/public/pdf/${it._id}`;
-      pdfBtn.target = '_blank';
-      pdfBtn.rel = 'noopener noreferrer';
-      pdfBtn.style.marginRight = '0.5rem';
-      actions.appendChild(pdfBtn);
-    }
     const editBtn = document.createElement('button'); editBtn.textContent='Editar';
     editBtn.addEventListener('click', ()=> openEdit(it));
     const delBtn = document.createElement('button'); delBtn.textContent='Remover';
@@ -121,7 +119,7 @@ function openEdit(item){
   if(item.tipo && item.tipo.toLowerCase()==='artigo') select.value='artigo';
   if (item.pdf_url || item.pdf_id || item.pdf) {
     const pdfLink = document.createElement('p');
-    pdfLink.innerHTML = `<a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>`;
+    pdfLink.innerHTML = `<a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo enviado</a>`;
     box.insertBefore(pdfLink, form);
   }
   form.addEventListener('submit', async (e)=>{
