@@ -165,6 +165,9 @@ function openEdit(item){
   if (item.pdf_url || item.pdf_id || item.pdf) {
     const linksBox = document.createElement('div');
     linksBox.style.marginBottom = '1rem';
+    linksBox.style.display = 'flex';
+    linksBox.style.flexDirection = 'column';
+    linksBox.style.gap = '0.35rem';
     const externalLine = item.link_externo ? `<div><a href="${item.link_externo}" target="_blank" rel="noopener noreferrer">Abrir URL externa</a></div>` : '';
     const pdfLine = `<div><a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo enviado</a></div>`;
     linksBox.innerHTML = `${externalLine}${pdfLine}`;
