@@ -229,6 +229,33 @@ app.get('/api/conteudos/:id/pdf', requireAuthApi, async (req, res) => {
   }
 });
 
+// Rota pública para servir PDF de conteúdo (sem exigir autenticação)
+app.get('/conteudo/public/pdf/:id', async (req, res) => {
+  try {
+    await connectDB();
+    const id = req.params.id;
+    const conteudo = await ConteudoRelacionado.findById(id).lean();
+    if (!conteudo) return res.status(404).send('Conteúdo não encontrado');
+
+    // Se o PDF está embutido no documento
+    if (conteudo.pdf && conteudo.pdf.length) {
+      const buffer = Buffer.from(conteudo.pdf.buffer || conteudo.pdf);
+      const mime = conteudo.pdf_mime || 'application/pdf';
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `inline; filename="${(conteudo.titulo || 'conteudo').replace(/\"/g, '')}.pdf"`);
+      return res.send(buffer);
+    }
+
+    // Se houver URL pública, redireciona
+    if (conteudo.pdf_url) return res.redirect(conteudo.pdf_url);
+
+    return res.status(404).send('PDF não disponível');
+  } catch (err) {
+    console.error('Erro em /conteudo/public/pdf/:id', err);
+    res.status(500).send('Erro ao carregar PDF');
+  }
+});
+
 // ==== VIEWS ====
 app.get('/', (req, res) => {
   try {
@@ -320,6 +347,11 @@ app.get('/addfaseok', requireAuthView, (req, res) => {
 
 app.get('/addcena', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcena', { title: 'Mapeamento de Jogos' });
+});
+
+// Página de administração de Conteúdos Relacionados (UI simples)
+app.get('/conteudos-admin', requireAuthView, requireAdmin, (req, res) => {
+  res.render('admin/conteudos/conteudos', { title: 'Conteúdos Relacionados' });
 });
 
 app.get('/addcenaok', requireAuthView, (req, res) => {
@@ -592,8 +624,13 @@ const normalizaTipoConteudo = (tipo) => {
 
 app.post('/api/conteudos', requireAdmin, uploadPdf.single('arquivo_pdf'), async (req, res) => {
   try {
-    const { titulo, descricao, link_externo, tag, tipo, jogos } = req.body;
+    const { titulo, descricao } = req.body;
+    let { link_externo, tag, tipo, jogos } = req.body;
     if (!titulo || !descricao) return badRequest(res, 'Título e descrição são obrigatórios');
+
+    // Normalizar campos opcionais: aceitar strings vazias do front-end e convertê-las para undefined
+    link_externo = link_externo && String(link_externo).trim() ? String(link_externo).trim() : undefined;
+    tag = tag && String(tag).trim() ? String(tag).trim() : undefined;
 
     const conteudoData = {
       titulo,

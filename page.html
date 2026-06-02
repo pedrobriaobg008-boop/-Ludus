@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conteúdos Relacionados • Ludus</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <aside class="sidebar">
+    <div class="logo-space">
+        <img src="/logo-ludus.png" alt="Ludus Logo">
+    </div>
+    <nav class="menu">
+        
+        <a href="/mapeamento" class="menu-item">
+            <span class="menu-icon">🎮</span>
+            Mapear Jogo
+        </a>
+        <a href="/usuario" class="menu-item">
+            <span class="menu-icon">👤</span>
+            Usuário
+        </a>
+        
+        <a href="/aulas" class="menu-item">
+            <span class="menu-icon">📖</span>
+            Aulas
+        </a>
+        
+        <a href="/turmas" class="menu-item">
+            <span class="menu-icon">👥</span>
+            Turmas
+        </a>
+        
+        <a href="/ocorrencias" class="menu-item">
+            <span class="menu-icon">📋</span>
+            Ocorrências
+        </a>
+        
+        <a href="/logout" class="menu-item">
+            <span class="menu-icon">🚪</span>
+            Sair
+        </a>
+    </nav>
+</aside>
+    <main class="main-content">
+      <h1>Conteúdos Relacionados</h1>
+
+      <section>
+        <h2>Criar novo</h2>
+    <form id="createForm" method="post" action="/api/conteudos" enctype="multipart/form-data">
+      <div>
+        <label>Título</label>
+        <input name="titulo" required />
+      </div>
+      <div>
+        <label>Descrição</label>
+        <textarea name="descricao" required></textarea>
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select name="tipo">
+          <option value="">-- selecione --</option>
+          <option value="artigo">Artigo</option>
+          <option value="evento">Evento</option>
+        </select>
+      </div>
+      <div>
+        <label>Link Externo (opcional)</label>
+        <input name="link_externo" />
+      </div>
+      <div>
+        <label>Tag (opcional)</label>
+        <input name="tag" />
+      </div>
+      <div>
+        <label>Jogos (IDs separados por vírgula)</label>
+        <input name="jogos" />
+      </div>
+      <div>
+        <label>Arquivo PDF (opcional)</label>
+        <input type="file" name="arquivo_pdf" accept="application/pdf" />
+      </div>
+      <div>
+        <button type="submit">Criar</button>
+      </div>
+    </form>
+      </section>
+
+      <section>
+        <h2>Lista</h2>
+        <div id="list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+async function loadList(){
+  const res = await fetch('/api/conteudos', { credentials: 'same-origin' });
+  const items = await res.json();
+  const root = document.getElementById('list');
+  root.innerHTML = '';
+  if(!items.length) { root.innerHTML = '<p>Nenhum conteúdo cadastrado.</p>'; return; }
+  const table = document.createElement('table');
+  table.border = 1;
+  const thead = document.createElement('thead');
+  thead.innerHTML = '<tr><th>Título</th><th>Tipo</th><th>Link</th><th>Jogos</th><th>Ações</th></tr>';
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  for(const it of items){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${it.link_externo||''}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
+    const actions = tr.querySelector('td:last-child');
+    const editBtn = document.createElement('button'); editBtn.textContent='Editar';
+    editBtn.addEventListener('click', ()=> openEdit(it));
+    const delBtn = document.createElement('button'); delBtn.textContent='Remover';
+    delBtn.addEventListener('click', ()=> removeItem(it._id));
+    actions.appendChild(editBtn); actions.appendChild(delBtn);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  root.appendChild(table);
+}
+
+function openEdit(item){
+  const overlay = document.createElement('div');
+  overlay.style.position='fixed'; overlay.style.left=0; overlay.style.top=0; overlay.style.right=0; overlay.style.bottom=0; overlay.style.background='rgba(0,0,0,0.4)';
+  const box = document.createElement('div'); box.style.background='#fff'; box.style.padding='1rem'; box.style.margin='2rem';
+  box.innerHTML = `
+    <h3>Editar: ${item.titulo}</h3>
+    <form id="editForm">
+      <div><label>Título</label><input name="titulo" value="${item.titulo||''}" required /></div>
+      <div><label>Descrição</label><textarea name="descricao" required>${item.descricao||''}</textarea></div>
+      <div><label>Tipo</label><select name="tipo"><option value="">--</option><option value="artigo">Artigo</option><option value="evento">Evento</option></select></div>
+      <div><label>Link Externo</label><input name="link_externo" value="${item.link_externo||''}" /></div>
+      <div><label>Tag</label><input name="tag" value="${item.tag||''}" /></div>
+      <div><label>Jogos (IDs)</label><input name="jogos" value="${(item.jogos||[]).join(',')}" /></div>
+      <div><button type="submit">Salvar</button> <button type="button" id="cancelBtn">Cancelar</button></div>
+    </form>
+  `;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  const form = box.querySelector('#editForm');
+  const select = form.querySelector('select[name="tipo"]');
+  if(item.tipo && item.tipo.toLowerCase()==='evento') select.value='evento';
+  if(item.tipo && item.tipo.toLowerCase()==='artigo') select.value='artigo';
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const data = new FormData(form);
+    // build plain object to send as JSON (no file upload via edit)
+    const payload = {};
+    for(const [k,v] of data.entries()) payload[k]=v;
+    // if link_externo is empty string, send empty string so backend clears it
+    const res = await fetch('/api/conteudos/'+item._id, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body: JSON.stringify(payload) });
+    if(res.ok){ alert('Atualizado'); loadList(); document.body.removeChild(overlay); } else { alert('Erro ao atualizar'); }
+  });
+  box.querySelector('#cancelBtn').addEventListener('click', ()=> document.body.removeChild(overlay));
+}
+
+async function removeItem(id){
+  if(!confirm('Remover conteúdo?')) return;
+  const res = await fetch('/api/conteudos/'+id, { method:'DELETE', credentials:'same-origin' });
+  if(res.ok) loadList(); else alert('Erro ao remover');
+}
+
+window.addEventListener('load', ()=>{ loadList(); });
+</script>
+
+<footer>
+        <div class="footer-content">
+            <p>Boschkotel: 26 &copy; 2023 - Todos os direitos reservados</p>
+        </div>
+    </footer>
+</body>
+</html>
