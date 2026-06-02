@@ -77,6 +77,15 @@ async function loadList(){
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${it.link_externo||''}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
     const actions = tr.querySelector('td:last-child');
+    if (it.pdf_url || it.pdf_id || it.pdf) {
+      const pdfBtn = document.createElement('a');
+      pdfBtn.textContent = 'Visualizar PDF';
+      pdfBtn.href = `/conteudo/public/pdf/${it._id}`;
+      pdfBtn.target = '_blank';
+      pdfBtn.rel = 'noopener noreferrer';
+      pdfBtn.style.marginRight = '0.5rem';
+      actions.appendChild(pdfBtn);
+    }
     const editBtn = document.createElement('button'); editBtn.textContent='Editar';
     editBtn.addEventListener('click', ()=> openEdit(it));
     const delBtn = document.createElement('button'); delBtn.textContent='Remover';
@@ -110,6 +119,11 @@ function openEdit(item){
   const select = form.querySelector('select[name="tipo"]');
   if(item.tipo && item.tipo.toLowerCase()==='evento') select.value='evento';
   if(item.tipo && item.tipo.toLowerCase()==='artigo') select.value='artigo';
+  if (item.pdf_url || item.pdf_id || item.pdf) {
+    const pdfLink = document.createElement('p');
+    pdfLink.innerHTML = `<a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir PDF</a>`;
+    box.insertBefore(pdfLink, form);
+  }
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const data = new FormData(form);
