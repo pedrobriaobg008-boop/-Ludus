@@ -76,7 +76,7 @@ async function loadList(){
   const table = document.createElement('table');
   table.border = 1;
   const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>Título</th><th>Tipo</th><th>Link</th><th>Arquivo</th><th>Jogos</th><th>Ações</th></tr>';
+  thead.innerHTML = '<tr><th>Título</th><th>Tipo</th><th>Links</th><th>Jogos</th><th>Ações</th></tr>';
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
   for(const it of items){
@@ -84,7 +84,8 @@ async function loadList(){
     const hasPdf = Boolean(it.pdf_url || it.pdf_id || it.pdf);
     const externalLinkHtml = it.link_externo ? `<a href="${it.link_externo}" target="_blank" rel="noopener noreferrer">Abrir URL</a>` : '';
     const pdfLinkHtml = hasPdf ? `<a href="/conteudo/public/pdf/${it._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo</a>` : '';
-    tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${externalLinkHtml}</td><td>${pdfLinkHtml}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
+    const linksHtml = [externalLinkHtml, pdfLinkHtml].filter(Boolean).map((html) => `<div class="content-link-row">${html}</div>`).join('');
+    tr.innerHTML = `<td>${it.titulo}</td><td>${it.tipo||''}</td><td>${linksHtml || ''}</td><td>${(it.jogos||[]).join(', ')}</td><td></td>`;
     const actions = tr.querySelector('td:last-child');
     const editBtn = document.createElement('button'); editBtn.textContent='Editar';
     editBtn.addEventListener('click', ()=> openEdit(it));
@@ -162,9 +163,12 @@ function openEdit(item){
   if(item.tipo && item.tipo.toLowerCase()==='evento') select.value='evento';
   if(item.tipo && item.tipo.toLowerCase()==='artigo') select.value='artigo';
   if (item.pdf_url || item.pdf_id || item.pdf) {
-    const pdfLink = document.createElement('p');
-    pdfLink.innerHTML = `<a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo enviado</a>`;
-    box.insertBefore(pdfLink, form);
+    const linksBox = document.createElement('div');
+    linksBox.style.marginBottom = '1rem';
+    const externalLine = item.link_externo ? `<div><a href="${item.link_externo}" target="_blank" rel="noopener noreferrer">Abrir URL externa</a></div>` : '';
+    const pdfLine = `<div><a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo enviado</a></div>`;
+    linksBox.innerHTML = `${externalLine}${pdfLine}`;
+    box.insertBefore(linksBox, form);
   }
   loadGamePickers((item.jogos || []).map(String), 'editGamePicker').then(() => {
     wireGamePicker('editGamePicker', 'editJogosInput');
