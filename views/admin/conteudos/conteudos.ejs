@@ -41,8 +41,10 @@
         <datalist id="tagSuggestions"></datalist>
       </div>
       <div>
-        <label>Jogos (IDs separados por vírgula)</label>
-        <input name="jogos" />
+        <label>Jogos vinculados</label>
+        <p class="helper-text">Selecione um ou mais jogos. Sem seleção, o conteúdo continua sendo salvo, mas não aparece em nenhuma página de jogo.</p>
+        <div id="createGamePicker" class="game-picker"></div>
+        <input type="hidden" name="jogos" id="createJogosInput" />
       </div>
       <div>
         <label>Arquivo PDF (opcional)</label>
@@ -95,6 +97,43 @@ async function loadList(){
   root.appendChild(table);
 }
 
+  async function loadGamePickers(selectedIds = [], targetId = 'createGamePicker') {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    const res = await fetch('/api/jogos', { credentials: 'same-origin' });
+    const jogos = await res.json();
+    const selectedSet = new Set((selectedIds || []).map(String));
+
+    target.innerHTML = jogos.map((jogo) => {
+      const id = String(jogo._id);
+      const checked = selectedSet.has(id) ? 'checked' : '';
+      const nome = (jogo.nome || id).replace(/"/g, '&quot;');
+      return `
+        <label class="game-picker__item">
+          <input type="checkbox" value="${id}" ${checked} data-game-checkbox />
+          <span>${nome}</span>
+        </label>
+      `;
+    }).join('');
+
+    return jogos;
+  }
+
+  function syncSelectedGames(container, hiddenInput) {
+    if (!container || !hiddenInput) return;
+    const selected = Array.from(container.querySelectorAll('[data-game-checkbox]:checked')).map((input) => input.value);
+    hiddenInput.value = selected.join(',');
+  }
+
+  function wireGamePicker(containerId, hiddenInputId) {
+    const container = document.getElementById(containerId);
+    const hiddenInput = document.getElementById(hiddenInputId);
+    if (!container || !hiddenInput) return;
+    container.addEventListener('change', () => syncSelectedGames(container, hiddenInput));
+    syncSelectedGames(container, hiddenInput);
+  }
+
 function openEdit(item){
   const overlay = document.createElement('div');
   overlay.style.position='fixed'; overlay.style.left=0; overlay.style.top=0; overlay.style.right=0; overlay.style.bottom=0; overlay.style.background='rgba(0,0,0,0.4)';
@@ -107,7 +146,12 @@ function openEdit(item){
       <div><label>Tipo</label><select name="tipo"><option value="">--</option><option value="artigo">Artigo</option><option value="evento">Evento</option></select></div>
       <div><label>Link Externo</label><input name="link_externo" value="${item.link_externo||''}" /></div>
       <div><label>Tag</label><input name="tag" value="${item.tag||''}" /></div>
-      <div><label>Jogos (IDs)</label><input name="jogos" value="${(item.jogos||[]).join(',')}" /></div>
+      <div>
+        <label>Jogos vinculados</label>
+        <p class="helper-text">Marque os jogos que devem exibir este conteúdo.</p>
+        <div id="editGamePicker" class="game-picker"></div>
+        <input type="hidden" name="jogos" id="editJogosInput" />
+      </div>
       <div><button type="submit">Salvar</button> <button type="button" id="cancelBtn">Cancelar</button></div>
     </form>
   `;
@@ -122,6 +166,9 @@ function openEdit(item){
     pdfLink.innerHTML = `<a href="/conteudo/public/pdf/${item._id}" target="_blank" rel="noopener noreferrer">Abrir arquivo enviado</a>`;
     box.insertBefore(pdfLink, form);
   }
+  loadGamePickers((item.jogos || []).map(String), 'editGamePicker').then(() => {
+    wireGamePicker('editGamePicker', 'editJogosInput');
+  });
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const data = new FormData(form);
@@ -142,6 +189,9 @@ async function removeItem(id){
 }
 
 window.addEventListener('load', ()=>{ loadList(); });
+loadGamePickers([], 'createGamePicker').then(() => {
+  wireGamePicker('createGamePicker', 'createJogosInput');
+});
 </script>
 
 <%- include('../../rodape.ejs') %>
