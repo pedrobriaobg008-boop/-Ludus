@@ -542,10 +542,10 @@ app.delete('/api/categorias/:id', requireAdmin, async (req, res) => {
 // ---- Jogos (admin) ----
 app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, res) => {
   try {
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url } = req.body;
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url, ativo } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
-    const jogoData = { nome, descricao, identificacao_unity, createdBy };
+    const jogoData = { nome, descricao, identificacao_unity, createdBy, ativo: ativo === undefined ? true : String(ativo) !== 'false' };
     if (req.file) {
       // Salva o buffer diretamente no documento e gera data URL para o front
       jogoData.icone = req.file.buffer;
@@ -569,8 +569,10 @@ app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, re
   }
 });
 
-app.get('/api/jogos', async (_req, res) => {
-  const jogos = await Jogo.find({}).populate('categorias', 'nome');
+app.get('/api/jogos', async (req, res) => {
+  // Administradores precisam ver jogos desabilitados para poderem reativá-los.
+  const filtro = isAdminPerfil(req.session?.user?.perfil) ? {} : { ativo: { $ne: false } };
+  const jogos = await Jogo.find(filtro).populate('categorias', 'nome');
   res.json(jogos);
 });
 
@@ -579,7 +581,7 @@ app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req,
     const jogo = await Jogo.findById(req.params.id);
     if (!jogo) return notFound(res);
     
-    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, categorias, video_demo_url, github_url } = req.body;
+    const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, categorias, video_demo_url, github_url, ativo } = req.body;
     
     if (nome) jogo.nome = nome;
     if (descricao) jogo.descricao = descricao;
@@ -589,6 +591,7 @@ app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req,
     if (xp_maxima) jogo.xp_maxima = xp_maxima;
     if (video_demo_url !== undefined) jogo.video_demo_url = video_demo_url || undefined;
     if (github_url !== undefined) jogo.github_url = github_url || undefined;
+    if (ativo !== undefined) jogo.ativo = String(ativo) !== 'false';
     const categoriasArr = toIdArray(categorias);
     if (categorias !== undefined) jogo.categorias = categoriasArr;
     
@@ -619,25 +622,27 @@ const normalizaTipoConteudo = (tipo) => {
   const t = String(tipo).trim().toLowerCase();
   if (t === 'artigo') return 'Artigo';
   if (t === 'evento') return 'Evento';
+  if (t === 'artigo e evento') return 'Artigo e Evento';
   return undefined;
 };
 
 app.post('/api/conteudos', requireAdmin, uploadPdf.single('arquivo_pdf'), async (req, res) => {
   try {
     const { titulo, descricao } = req.body;
-    let { link_externo, tag, tipo, jogos } = req.body;
+    let { link_externo, tipo, jogos, data_postagem } = req.body;
     if (!titulo || !descricao) return badRequest(res, 'Título e descrição são obrigatórios');
 
     // Normalizar campos opcionais: aceitar strings vazias do front-end e convertê-las para undefined
     link_externo = link_externo && String(link_externo).trim() ? String(link_externo).trim() : undefined;
-    tag = tag && String(tag).trim() ? String(tag).trim() : undefined;
+    data_postagem = data_postagem ? new Date(`${data_postagem}T00:00:00`) : undefined;
+    if (data_postagem && Number.isNaN(data_postagem.getTime())) return badRequest(res, 'Data de postagem inválida');
 
     const conteudoData = {
       titulo,
       descricao,
       link_externo,
-      tag,
       tipo: normalizaTipoConteudo(tipo),
+      data_postagem,
       pdf: req.file ? req.file.buffer : undefined,
       pdf_mime: req.file ? req.file.mimetype : undefined,
       pdf_id: null,
@@ -666,13 +671,17 @@ app.put('/api/conteudos/:id', requireAdmin, uploadPdf.single('arquivo_pdf'), asy
     const conteudo = await ConteudoRelacionado.findById(req.params.id);
     if (!conteudo) return notFound(res);
 
-    const { titulo, descricao, link_externo, tag, tipo, jogos } = req.body;
+    const { titulo, descricao, link_externo, tipo, jogos, data_postagem } = req.body;
 
     if (titulo) conteudo.titulo = titulo;
     if (descricao) conteudo.descricao = descricao;
     if (link_externo !== undefined) conteudo.link_externo = link_externo || undefined;
-    if (tag !== undefined) conteudo.tag = tag || undefined;
     if (tipo !== undefined) conteudo.tipo = normalizaTipoConteudo(tipo);
+    if (data_postagem !== undefined) {
+      const data = data_postagem ? new Date(`${data_postagem}T00:00:00`) : undefined;
+      if (data && Number.isNaN(data.getTime())) return badRequest(res, 'Data de postagem inválida');
+      conteudo.data_postagem = data;
+    }
     if (jogos !== undefined) conteudo.jogos = toIdArray(jogos);
 
     if (req.file) {

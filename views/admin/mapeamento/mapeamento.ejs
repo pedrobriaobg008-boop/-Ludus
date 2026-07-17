@@ -21,9 +21,10 @@
         th, td { padding:12px 10px; border-bottom:1px solid #e5e7eb; text-align:left; }
         th { color:#475569; font-weight:700; font-size:14px; }
         td { color:#0f172a; font-size:14px; vertical-align:top; }
-        .alert { margin-bottom:12px; padding:10px 12px; border-radius:10px; font-size:14px; display:none; }
-        .alert.success { background:#ecfdf3; color:#15803d; border:1px solid #bbf7d0; }
-        .alert.error { background:#fef2f2; color:#b91c1c; border:1px solid #fecdd3; }
+        .toast { position:fixed; right:24px; bottom:24px; z-index:1000; max-width:min(360px, calc(100vw - 32px)); padding:12px 16px; border-radius:10px; font-size:14px; box-shadow:0 12px 28px rgba(15,23,42,.18); opacity:0; transform:translateY(12px); pointer-events:none; transition:opacity .2s,transform .2s; }
+        .toast.show { opacity:1; transform:translateY(0); }
+        .toast.success { background:#ecfdf3; color:#15803d; border:1px solid #bbf7d0; }
+        .toast.error { background:#fef2f2; color:#b91c1c; border:1px solid #fecdd3; }
         .search { margin: -4px 0 10px 0; }
         .search input { width:240px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
         .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#4338ca; font-size:12px; margin:0 4px 4px 0; }
@@ -45,7 +46,7 @@
             </div>
         </div>
 
-        <div id="alert" class="alert"></div>
+        <div id="alert" class="toast" role="status" aria-live="polite"></div>
 
         <% if (isAdmin) { %>
         <section class="card">
@@ -98,6 +99,10 @@
                         <label>XP máxima</label>
                         <input type="number" min="0" id="xp_maxima" placeholder="Ex: 5000">
                     </div>
+                    <div class="field">
+                        <label><input type="checkbox" id="ativo" checked> Exibir jogo na lista</label>
+                        <p class="small-note">Desmarque temporariamente para ocultar o jogo dos demais usuários, sem excluí-lo.</p>
+                    </div>
                 </div>
                 <div class="actions" style="margin-top:12px;">
                     <button type="submit" class="btn btn-primary" id="submitLabel">Salvar</button>
@@ -128,12 +133,13 @@
                         <th>Ícone</th>
                         <% if (isAdmin) { %>
                         <th>Níveis / XP</th>
+                        <th>Status</th>
                         <th style="width:160px;">Ações</th>
                         <% } %>
                     </tr>
                     </thead>
                     <tbody id="jogosBody">
-                    <tr><td colspan="<%= isAdmin ? 8 : 5 %>" style="color:#94a3b8;">Carregando...</td></tr>
+                    <tr><td colspan="<%= isAdmin ? 9 : 5 %>" style="color:#94a3b8;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -183,10 +189,6 @@
                         <input type="text" id="conteudoTitulo" required>
                     </div>
                     <div class="field">
-                        <label>Tag (opcional)</label>
-                        <input type="text" id="conteudoTag" placeholder="Ex: IA, Educação">
-                    </div>
-                    <div class="field">
                         <label>Descrição *</label>
                         <textarea id="conteudoDescricao" required></textarea>
                     </div>
@@ -196,7 +198,12 @@
                             <option value="">Selecione</option>
                             <option value="Artigo">Artigo</option>
                             <option value="Evento">Evento</option>
+                            <option value="Artigo e Evento">Artigo e Evento</option>
                         </select>
+                    </div>
+                    <div class="field">
+                        <label>Data de postagem</label>
+                        <input type="date" id="conteudoDataPostagem">
                     </div>
                     <div class="field">
                         <label>Link externo (opcional)</label>
@@ -223,7 +230,7 @@
                     <thead>
                         <tr>
                             <th>Título</th>
-                            <th>Tag / Tipo</th>
+                            <th>Tipo / postagem</th>
                             <th>Links</th>
                             <th>Jogos</th>
                             <th style="width:160px;">Ações</th>
@@ -242,7 +249,7 @@
 <script>
     const apiBase = '/api/jogos';
     const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
-    const colSpan = isAdmin ? 8 : 5;
+    const colSpan = isAdmin ? 9 : 5;
     const form = document.getElementById('jogoForm');
     const alertBox = document.getElementById('alert');
     const tbody = document.getElementById('jogosBody');
@@ -267,8 +274,8 @@
     const conteudoTitulo = document.getElementById('conteudoTitulo');
     const conteudoDescricao = document.getElementById('conteudoDescricao');
     const conteudoLink = document.getElementById('conteudoLink');
-    const conteudoTag = document.getElementById('conteudoTag');
     const conteudoTipo = document.getElementById('conteudoTipo');
+    const conteudoDataPostagem = document.getElementById('conteudoDataPostagem');
     const conteudoPdf = document.getElementById('conteudoPdf');
     const conteudoJogos = document.getElementById('conteudoJogos');
     const conteudoCancel = document.getElementById('conteudoCancel');
@@ -278,11 +285,17 @@
     let categorias = [];
     let conteudos = [];
 
+    let toastTimer;
     function showMessage(type, msg) {
         alertBox.textContent = msg;
-        alertBox.className = 'alert ' + type;
-        alertBox.style.display = 'block';
-        setTimeout(() => { alertBox.style.display = 'none'; }, 3000);
+        alertBox.className = 'toast ' + type + ' show';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { alertBox.classList.remove('show'); }, 3000);
+    }
+
+    function focusEditor(editor, field) {
+        editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => field?.focus({ preventScroll: true }), 350);
     }
 
     function resetForm() {
@@ -320,7 +333,7 @@
             : jogos;
 
         if (!lista.length) {
-            tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 : 5}" style="color:#94a3b8;">Nenhum jogo cadastrado.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="color:#94a3b8;">Nenhum jogo cadastrado.</td></tr>`;
             return;
         }
 
@@ -353,6 +366,7 @@
                     ` : '<span style="font-size:11px;color:#94a3b8;">Sem imagem</span>'}
                 </td>
                 ${isAdmin ? `<td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>` : ''}
+                ${isAdmin ? `<td><span class="badge" style="background:${j.ativo === false ? '#fee2e2' : '#dcfce7'};color:${j.ativo === false ? '#b91c1c' : '#15803d'};">${j.ativo === false ? 'Desabilitado' : 'Ativo'}</span></td>` : ''}
                 ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
             </tr>`;
         }).join('');
@@ -392,6 +406,7 @@
         setSelectedCategorias((j.categorias || []).map(c => c._id || c));
         document.getElementById('total_niveis').value = j.total_niveis || '';
         document.getElementById('xp_maxima').value = j.xp_maxima || '';
+        document.getElementById('ativo').checked = j.ativo !== false;
         
         // Mostrar imagem atual se existir
         const iconPreview = document.getElementById('iconPreview');
@@ -405,6 +420,7 @@
         
         submitLabel.textContent = 'Atualizar';
         cancelEditBtn.style.display = 'inline-flex';
+        focusEditor(form.closest('.card'), document.getElementById('nome'));
     };
 
     if (cancelEditBtn) {
@@ -441,6 +457,7 @@
         
         const xpMaxima = document.getElementById('xp_maxima').value.trim();
         if (xpMaxima) formData.append('xp_maxima', xpMaxima);
+        formData.append('ativo', document.getElementById('ativo').checked);
 
         // Adicionar arquivo se selecionado
         const iconeInput = document.getElementById('icone');
@@ -517,6 +534,7 @@
         categoriaNomeInput.value = cat.nome;
         categoriaCancel.style.display = 'inline-flex';
         document.getElementById('categoriaSubmit').textContent = 'Atualizar';
+        focusEditor(categoriaForm.closest('.card'), categoriaNomeInput);
     };
 
     window.removerCategoria = async (id) => {
@@ -591,14 +609,15 @@
         conteudosBody.innerHTML = conteudos.map(c => {
             const links = [
                 c.link_externo ? `<a href="${c.link_externo}" target="_blank">Externo</a>` : null,
-                (c.pdf_id || c.pdf_url) ? `<a href="${c.pdf_id ? `/api/conteudos/${c._id}/pdf` : c.pdf_url}" target="_blank">PDF</a>` : null
+                (c.pdf || c.pdf_id || c.pdf_url) ? `<a href="/conteudo/public/pdf/${c._id}" target="_blank" rel="noopener noreferrer">PDF</a>` : null
             ].filter(Boolean).join('<br>') || '—';
             const jogosTxt = (c.jogos || []).map(j => j?.nome || j?.identificacao_unity || 'Jogo').join(', ') || '—';
-            const tagTipo = [c.tag, c.tipo].filter(Boolean).join(' / ') || '—';
+            const dataPostagem = c.data_postagem ? new Date(c.data_postagem).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '';
+            const tipoPostagem = [c.tipo, dataPostagem].filter(Boolean).join(' / ') || '—';
             return `
                 <tr>
                     <td>${c.titulo}</td>
-                    <td>${tagTipo}</td>
+                    <td>${tipoPostagem}</td>
                     <td>${links}</td>
                     <td>${jogosTxt}</td>
                     <td><div class="actions"><button class="btn btn-ghost" onclick="editarConteudo('${c._id}')">Editar</button><button class="btn btn-danger" onclick="removerConteudo('${c._id}')">Remover</button></div></td>
@@ -614,11 +633,12 @@
         conteudoTitulo.value = c.titulo || '';
         conteudoDescricao.value = c.descricao || '';
         conteudoLink.value = c.link_externo || '';
-        conteudoTag.value = c.tag || '';
         conteudoTipo.value = c.tipo || '';
+        conteudoDataPostagem.value = c.data_postagem ? new Date(c.data_postagem).toISOString().slice(0, 10) : '';
         setConteudoJogos((c.jogos || []).map(j => j?._id || j));
         conteudoCancel.style.display = 'inline-flex';
         document.getElementById('conteudoSubmit').textContent = 'Atualizar conteúdo';
+        focusEditor(conteudoForm.closest('.card'), conteudoTitulo);
     };
 
     window.removerConteudo = async (id) => {
@@ -645,8 +665,8 @@
             formData.append('titulo', titulo);
             formData.append('descricao', descricao);
             if (conteudoLink.value.trim()) formData.append('link_externo', conteudoLink.value.trim());
-            if (conteudoTag.value.trim()) formData.append('tag', conteudoTag.value.trim());
-            if (conteudoTipo.value) formData.append('tipo', conteudoTipo.value);
+            formData.append('tipo', conteudoTipo.value);
+            formData.append('data_postagem', conteudoDataPostagem.value);
             const jogosSelecionados = conteudoJogos ? [...conteudoJogos.options].filter(o => o.selected).map(o => o.value) : [];
             jogosSelecionados.forEach(id => formData.append('jogos', id));
             if (conteudoPdf.files.length > 0) formData.append('arquivo_pdf', conteudoPdf.files[0]);

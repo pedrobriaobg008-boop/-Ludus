@@ -22,6 +22,7 @@ const JogoSchema = new mongoose.Schema({
   categorias: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Categoria' }],
   total_niveis: { type: Number },
   xp_maxima: { type: Number },
+  ativo: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
   createdAt: { type: Date, default: Date.now }
 });
