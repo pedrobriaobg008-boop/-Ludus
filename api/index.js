@@ -349,11 +349,6 @@ app.get('/addcena', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcena', { title: 'Mapeamento de Jogos' });
 });
 
-// Página de administração de Conteúdos Relacionados (UI simples)
-app.get('/conteudos-admin', requireAuthView, requireAdmin, (req, res) => {
-  res.render('admin/conteudos/conteudos', { title: 'Conteúdos Relacionados' });
-});
-
 app.get('/addcenaok', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcenaok', { nomeFase: req.query['nome-fase'] });
 });
