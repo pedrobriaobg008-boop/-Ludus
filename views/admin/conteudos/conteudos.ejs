@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> • Ludus</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .page-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:20px; }
+        .page-header h1 { margin:0; }
+        .page-header p { color:#64748b; margin:6px 0 0; }
+        .card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:22px; box-shadow:0 8px 24px rgba(15,23,42,.06); }
+        .card + .card { margin-top:18px; }
+        .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:18px; }
+        .card-head h2 { margin:0; font-size:20px; }
+        .card-head p { margin:4px 0 0; color:#64748b; font-size:14px; }
+        .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+        .field { min-width:0; }
+        .field.full { grid-column:1 / -1; }
+        .field label { display:block; margin-bottom:6px; color:#334155; font-size:14px; font-weight:600; }
+        .field input, .field select, .field textarea { box-sizing:border-box; width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#0f172a; font:inherit; }
+        .field textarea { min-height:105px; resize:vertical; }
+        .field select[multiple] { min-height:116px; background:#f8fafc; }
+        .hint { margin:5px 0 0; color:#64748b; font-size:12px; }
+        .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+        .btn { border:0; border-radius:8px; padding:10px 14px; cursor:pointer; font:inherit; font-weight:600; }
+        .btn-primary { background:#2563eb; color:#fff; }
+        .btn-secondary { background:#e2e8f0; color:#0f172a; }
+        .btn-danger { background:#dc2626; color:#fff; }
+        .table-wrap { overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; min-width:760px; }
+        th, td { padding:12px 10px; border-bottom:1px solid #e2e8f0; text-align:left; vertical-align:top; }
+        th { color:#475569; font-size:13px; }
+        td { color:#1e293b; font-size:14px; }
+        .empty { color:#64748b; text-align:center; padding:24px; }
+        .toast { position:fixed; right:24px; bottom:24px; z-index:10; max-width:360px; padding:12px 16px; border-radius:10px; box-shadow:0 12px 28px rgba(15,23,42,.18); opacity:0; transform:translateY(12px); pointer-events:none; transition:.2s; }
+        .toast.show { opacity:1; transform:translateY(0); }
+        .toast.success { color:#166534; background:#dcfce7; }
+        .toast.error { color:#991b1b; background:#fee2e2; }
+        @media (max-width:720px) { .page-header, .card-head { flex-direction:column; } .grid { grid-template-columns:1fr; } .card { padding:16px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <%- include('../../partials/sidebar') %>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Conteúdos Relacionados</h1>
+                <p>Cadastre artigos e eventos e relacione-os aos jogos.</p>
+            </div>
+        </header>
+
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+        <section class="card" id="editorCard">
+            <div class="card-head">
+                <div><h2 id="formTitle">Novo conteúdo</h2><p>Os campos marcados com * são obrigatórios.</p></div>
+            </div>
+            <form id="conteudoForm">
+                <input type="hidden" id="conteudoId">
+                <div class="grid">
+                    <div class="field"><label for="titulo">Título *</label><input id="titulo" required></div>
+                    <div class="field"><label for="tipo">Tipo</label><select id="tipo"><option value="">Selecione</option><option>Artigo</option><option>Evento</option><option>Artigo e Evento</option></select></div>
+                    <div class="field full"><label for="descricao">Descrição *</label><textarea id="descricao" required></textarea></div>
+                    <div class="field"><label for="dataPostagem">Data de postagem</label><input id="dataPostagem" type="date"></div>
+                    <div class="field"><label for="linkExterno">Link externo</label><input id="linkExterno" type="url" placeholder="https://..."></div>
+                    <div class="field"><label for="arquivoPdf">Arquivo PDF</label><input id="arquivoPdf" type="file" accept="application/pdf"><p class="hint">Em uma edição, o novo arquivo substitui o PDF atual.</p></div>
+                    <div class="field"><label for="jogos">Jogos relacionados</label><select id="jogos" multiple size="5"></select><p class="hint">Use Ctrl/Cmd para selecionar mais de um jogo.</p></div>
+                </div>
+                <div class="actions"><button class="btn btn-primary" id="submitButton" type="submit">Salvar conteúdo</button><button class="btn btn-secondary" id="cancelButton" type="button" hidden>Cancelar edição</button></div>
+            </form>
+        </section>
+
+        <section class="card">
+            <div class="card-head"><div><h2>Conteúdos cadastrados</h2><p>Gerencie os conteúdos disponíveis para os jogos.</p></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Título</th><th>Tipo / postagem</th><th>Links</th><th>Jogos</th><th>Ações</th></tr></thead><tbody id="conteudosBody"><tr><td class="empty" colspan="5">Carregando conteúdos...</td></tr></tbody></table></div>
+        </section>
+    </main>
+</div>
+<script>
+    const form = document.getElementById('conteudoForm');
+    const idInput = document.getElementById('conteudoId');
+    const titulo = document.getElementById('titulo');
+    const descricao = document.getElementById('descricao');
+    const tipo = document.getElementById('tipo');
+    const dataPostagem = document.getElementById('dataPostagem');
+    const linkExterno = document.getElementById('linkExterno');
+    const arquivoPdf = document.getElementById('arquivoPdf');
+    const jogosSelect = document.getElementById('jogos');
+    const conteudosBody = document.getElementById('conteudosBody');
+    const cancelButton = document.getElementById('cancelButton');
+    const submitButton = document.getElementById('submitButton');
+    const formTitle = document.getElementById('formTitle');
+    const toast = document.getElementById('toast');
+    let conteudos = [];
+    let toastTimer;
+
+    const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+    function showMessage(type, message) { toast.textContent = message; toast.className = `toast ${type} show`; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 3200); }
+    function selectedGameIds() { return [...jogosSelect.options].filter(option => option.selected).map(option => option.value); }
+    function setSelectedGames(ids = []) { const selected = new Set(ids.map(id => String(id?._id || id))); [...jogosSelect.options].forEach(option => option.selected = selected.has(option.value)); }
+    function resetForm() { form.reset(); idInput.value = ''; setSelectedGames(); formTitle.textContent = 'Novo conteúdo'; submitButton.textContent = 'Salvar conteúdo'; cancelButton.hidden = true; }
+
+    async function loadGames() {
+        const response = await fetch('/api/jogos', { credentials:'same-origin' });
+        if (!response.ok) throw new Error('Não foi possível carregar os jogos');
+        const jogos = await response.json();
+        jogosSelect.innerHTML = jogos.map(jogo => `<option value="${jogo._id}">${escapeHtml(jogo.nome || jogo.identificacao_unity || 'Jogo')}</option>`).join('');
+    }
+    function renderConteudos() {
+        if (!conteudos.length) { conteudosBody.innerHTML = '<tr><td class="empty" colspan="5">Nenhum conteúdo cadastrado.</td></tr>'; return; }
+        conteudosBody.innerHTML = conteudos.map(item => {
+            const data = item.data_postagem ? new Date(item.data_postagem).toLocaleDateString('pt-BR', { timeZone:'UTC' }) : '';
+            const tipoData = [item.tipo, data].filter(Boolean).map(escapeHtml).join(' / ') || '—';
+            const links = [item.link_externo ? `<a href="${escapeHtml(item.link_externo)}" target="_blank" rel="noopener">Externo</a>` : '', (item.pdf || item.pdf_id || item.pdf_url) ? `<a href="/api/conteudos/${item._id}/pdf" target="_blank" rel="noopener">PDF</a>` : ''].filter(Boolean).join('<br>') || '—';
+            const jogos = (item.jogos || []).map(jogo => escapeHtml(jogo?.nome || jogo?.identificacao_unity || 'Jogo')).join(', ') || '—';
+            return `<tr><td><strong>${escapeHtml(item.titulo)}</strong><br><span class="hint">${escapeHtml(item.descricao || '')}</span></td><td>${tipoData}</td><td>${links}</td><td>${jogos}</td><td><button class="btn btn-secondary" type="button" data-edit="${item._id}">Editar</button> <button class="btn btn-danger" type="button" data-delete="${item._id}">Remover</button></td></tr>`;
+        }).join('');
+    }
+    async function loadConteudos() {
+        conteudosBody.innerHTML = '<tr><td class="empty" colspan="5">Carregando conteúdos...</td></tr>';
+        try { const response = await fetch('/api/conteudos', { credentials:'same-origin' }); if (!response.ok) throw new Error('Erro ao carregar conteúdos'); conteudos = await response.json(); renderConteudos(); }
+        catch (error) { conteudosBody.innerHTML = `<tr><td class="empty" colspan="5">${escapeHtml(error.message)}</td></tr>`; }
+    }
+    function editConteudo(id) {
+        const item = conteudos.find(conteudo => conteudo._id === id); if (!item) return;
+        idInput.value = item._id; titulo.value = item.titulo || ''; descricao.value = item.descricao || ''; tipo.value = item.tipo || ''; linkExterno.value = item.link_externo || '';
+        dataPostagem.value = item.data_postagem ? new Date(item.data_postagem).toISOString().slice(0, 10) : ''; setSelectedGames(item.jogos || []);
+        formTitle.textContent = 'Editar conteúdo'; submitButton.textContent = 'Atualizar conteúdo'; cancelButton.hidden = false;
+        document.getElementById('editorCard').scrollIntoView({ behavior:'smooth', block:'start' }); titulo.focus({ preventScroll:true });
+    }
+    async function deleteConteudo(id) {
+        if (!confirm('Remover este conteúdo?')) return;
+        try { const response = await fetch(`/api/conteudos/${id}`, { method:'DELETE', credentials:'same-origin' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao remover conteúdo'); showMessage('success', 'Conteúdo removido.'); if (idInput.value === id) resetForm(); await loadConteudos(); }
+        catch (error) { showMessage('error', error.message); }
+    }
+    conteudosBody.addEventListener('click', event => { const edit = event.target.closest('[data-edit]'); const remove = event.target.closest('[data-delete]'); if (edit) editConteudo(edit.dataset.edit); if (remove) deleteConteudo(remove.dataset.delete); });
+    cancelButton.addEventListener('click', resetForm);
+    form.addEventListener('submit', async event => {
+        event.preventDefault(); if (!titulo.value.trim() || !descricao.value.trim()) return showMessage('error', 'Título e descrição são obrigatórios.');
+        const body = new FormData(); body.append('titulo', titulo.value.trim()); body.append('descricao', descricao.value.trim()); body.append('tipo', tipo.value); body.append('data_postagem', dataPostagem.value); body.append('link_externo', linkExterno.value.trim()); selectedGameIds().forEach(id => body.append('jogos', id)); if (arquivoPdf.files[0]) body.append('arquivo_pdf', arquivoPdf.files[0]);
+        const editing = Boolean(idInput.value);
+        try { const response = await fetch(editing ? `/api/conteudos/${idInput.value}` : '/api/conteudos', { method:editing ? 'PUT' : 'POST', body, credentials:'same-origin' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao salvar conteúdo'); showMessage('success', editing ? 'Conteúdo atualizado.' : 'Conteúdo cadastrado.'); resetForm(); await loadConteudos(); }
+        catch (error) { showMessage('error', error.message); }
+    });
+    Promise.all([loadGames(), loadConteudos()]).catch(error => showMessage('error', error.message));
+</script>
+</body>
+</html>

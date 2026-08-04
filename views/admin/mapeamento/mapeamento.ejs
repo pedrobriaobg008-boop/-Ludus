@@ -176,72 +176,6 @@
             </div>
         </section>
 
-        <section class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px;">
-                <h3 style="margin:0;">Conteúdos Relacionados</h3>
-                <p class="small-note" style="margin:0;">Cadastre artigos/eventos vinculados aos jogos</p>
-            </div>
-            <form id="conteudoForm">
-                <input type="hidden" id="conteudoId">
-                <div class="grid-2">
-                    <div class="field">
-                        <label>Título *</label>
-                        <input type="text" id="conteudoTitulo" required>
-                    </div>
-                    <div class="field">
-                        <label>Descrição *</label>
-                        <textarea id="conteudoDescricao" required></textarea>
-                    </div>
-                    <div class="field">
-                        <label>Tipo (opcional)</label>
-                        <select id="conteudoTipo">
-                            <option value="">Selecione</option>
-                            <option value="Artigo">Artigo</option>
-                            <option value="Evento">Evento</option>
-                            <option value="Artigo e Evento">Artigo e Evento</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Data de postagem</label>
-                        <input type="date" id="conteudoDataPostagem">
-                    </div>
-                    <div class="field">
-                        <label>Link externo (opcional)</label>
-                        <input type="url" id="conteudoLink" placeholder="https://...">
-                    </div>
-                    <div class="field">
-                        <label>Arquivo PDF (opcional)</label>
-                        <input type="file" id="conteudoPdf" accept="application/pdf">
-                        <p class="small-note">Se enviar novamente em edição, substitui o arquivo</p>
-                    </div>
-                    <div class="field">
-                        <label>Jogos relacionados (opcional)</label>
-                        <select id="conteudoJogos" multiple size="4" style="width:100%; min-height:110px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc;"></select>
-                        <p class="small-note">Use Ctrl/Cmd para selecionar vários</p>
-                    </div>
-                </div>
-                <div class="actions" style="margin-top:12px;">
-                    <button type="submit" class="btn btn-primary" id="conteudoSubmit">Salvar conteúdo</button>
-                    <button type="button" class="btn btn-ghost" id="conteudoCancel" style="display:none;">Cancelar edição</button>
-                </div>
-            </form>
-            <div class="table-wrap" style="margin-top:12px;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Título</th>
-                            <th>Tipo / postagem</th>
-                            <th>Links</th>
-                            <th>Jogos</th>
-                            <th style="width:160px;">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="conteudosBody">
-                        <tr><td colspan="5" style="color:#94a3b8;">Carregando conteúdos...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
         <% } %>
     </main>
 </div>
@@ -268,22 +202,8 @@
     const categoriaCancel = document.getElementById('categoriaCancel');
     const categoriasBody = document.getElementById('categoriasBody');
 
-    // Conteúdos relacionados
-    const conteudoForm = document.getElementById('conteudoForm');
-    const conteudoIdInput = document.getElementById('conteudoId');
-    const conteudoTitulo = document.getElementById('conteudoTitulo');
-    const conteudoDescricao = document.getElementById('conteudoDescricao');
-    const conteudoLink = document.getElementById('conteudoLink');
-    const conteudoTipo = document.getElementById('conteudoTipo');
-    const conteudoDataPostagem = document.getElementById('conteudoDataPostagem');
-    const conteudoPdf = document.getElementById('conteudoPdf');
-    const conteudoJogos = document.getElementById('conteudoJogos');
-    const conteudoCancel = document.getElementById('conteudoCancel');
-    const conteudosBody = document.getElementById('conteudosBody');
-
     let jogos = [];
     let categorias = [];
-    let conteudos = [];
 
     let toastTimer;
     function showMessage(type, msg) {
@@ -323,7 +243,6 @@
             jogos = [];
         }
         renderJogos();
-        renderJogosOptions();
     }
 
     function renderJogos() {
@@ -376,19 +295,6 @@
         if (!categoriasSelect) return;
         const set = new Set((ids || []).map(String));
         [...categoriasSelect.options].forEach(opt => {
-            opt.selected = set.has(opt.value);
-        });
-    }
-
-    function renderJogosOptions() {
-        if (!conteudoJogos) return;
-        conteudoJogos.innerHTML = jogos.map(j => `<option value="${j._id}">${j.nome || j.identificacao_unity || 'Jogo'}</option>`).join('');
-    }
-
-    function setConteudoJogos(ids = []) {
-        if (!conteudoJogos) return;
-        const set = new Set((ids || []).map(String));
-        [...conteudoJogos.options].forEach(opt => {
             opt.selected = set.has(opt.value);
         });
     }
@@ -576,120 +482,6 @@
         categoriaCancel?.addEventListener('click', resetCategoriaForm);
     }
 
-    // ===== Conteúdos Relacionados =====
-    function resetConteudoForm() {
-        if (!conteudoForm) return;
-        conteudoForm.reset();
-        conteudoIdInput.value = '';
-        conteudoCancel.style.display = 'none';
-        document.getElementById('conteudoSubmit').textContent = 'Salvar conteúdo';
-        setConteudoJogos([]);
-    }
-
-    async function fetchConteudos() {
-        if (!conteudosBody) return;
-        conteudosBody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Carregando conteúdos...</td></tr>';
-        try {
-            const res = await fetch('/api/conteudos', { credentials: 'same-origin' });
-            if (!res.ok) throw new Error('Erro ao carregar conteúdos');
-            conteudos = await res.json();
-        } catch (err) {
-            conteudos = [];
-            showMessage('error', err.message);
-        }
-        renderConteudos();
-    }
-
-    function renderConteudos() {
-        if (!conteudosBody) return;
-        if (!conteudos.length) {
-            conteudosBody.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">Nenhum conteúdo cadastrado.</td></tr>';
-            return;
-        }
-        conteudosBody.innerHTML = conteudos.map(c => {
-            const links = [
-                c.link_externo ? `<a href="${c.link_externo}" target="_blank">Externo</a>` : null,
-                (c.pdf || c.pdf_id || c.pdf_url) ? `<a href="/conteudo/public/pdf/${c._id}" target="_blank" rel="noopener noreferrer">PDF</a>` : null
-            ].filter(Boolean).join('<br>') || '—';
-            const jogosTxt = (c.jogos || []).map(j => j?.nome || j?.identificacao_unity || 'Jogo').join(', ') || '—';
-            const dataPostagem = c.data_postagem ? new Date(c.data_postagem).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '';
-            const tipoPostagem = [c.tipo, dataPostagem].filter(Boolean).join(' / ') || '—';
-            return `
-                <tr>
-                    <td>${c.titulo}</td>
-                    <td>${tipoPostagem}</td>
-                    <td>${links}</td>
-                    <td>${jogosTxt}</td>
-                    <td><div class="actions"><button class="btn btn-ghost" onclick="editarConteudo('${c._id}')">Editar</button><button class="btn btn-danger" onclick="removerConteudo('${c._id}')">Remover</button></div></td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    window.editarConteudo = (id) => {
-        const c = conteudos.find(item => item._id === id);
-        if (!c) return;
-        conteudoIdInput.value = c._id;
-        conteudoTitulo.value = c.titulo || '';
-        conteudoDescricao.value = c.descricao || '';
-        conteudoLink.value = c.link_externo || '';
-        conteudoTipo.value = c.tipo || '';
-        conteudoDataPostagem.value = c.data_postagem ? new Date(c.data_postagem).toISOString().slice(0, 10) : '';
-        setConteudoJogos((c.jogos || []).map(j => j?._id || j));
-        conteudoCancel.style.display = 'inline-flex';
-        document.getElementById('conteudoSubmit').textContent = 'Atualizar conteúdo';
-        focusEditor(conteudoForm.closest('.card'), conteudoTitulo);
-    };
-
-    window.removerConteudo = async (id) => {
-        if (!confirm('Remover conteúdo?')) return;
-        try {
-            const res = await fetch(`/api/conteudos/${id}`, { method: 'DELETE', credentials: 'same-origin' });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Erro ao remover conteúdo');
-            showMessage('success', 'Conteúdo removido');
-            await fetchConteudos();
-        } catch (err) {
-            showMessage('error', err.message);
-        }
-    };
-
-    if (conteudoForm) {
-        conteudoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const titulo = conteudoTitulo.value.trim();
-            const descricao = conteudoDescricao.value.trim();
-            if (!titulo || !descricao) return showMessage('error', 'Título e descrição são obrigatórios');
-
-            const formData = new FormData();
-            formData.append('titulo', titulo);
-            formData.append('descricao', descricao);
-            if (conteudoLink.value.trim()) formData.append('link_externo', conteudoLink.value.trim());
-            formData.append('tipo', conteudoTipo.value);
-            formData.append('data_postagem', conteudoDataPostagem.value);
-            const jogosSelecionados = conteudoJogos ? [...conteudoJogos.options].filter(o => o.selected).map(o => o.value) : [];
-            jogosSelecionados.forEach(id => formData.append('jogos', id));
-            if (conteudoPdf.files.length > 0) formData.append('arquivo_pdf', conteudoPdf.files[0]);
-
-            const isEdit = !!conteudoIdInput.value;
-            try {
-                const res = await fetch(isEdit ? `/api/conteudos/${conteudoIdInput.value}` : '/api/conteudos', {
-                    method: isEdit ? 'PUT' : 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Erro ao salvar conteúdo');
-                showMessage('success', isEdit ? 'Conteúdo atualizado' : 'Conteúdo criado');
-                resetConteudoForm();
-                fetchConteudos();
-            } catch (err) {
-                showMessage('error', err.message);
-            }
-        });
-        conteudoCancel?.addEventListener('click', resetConteudoForm);
-    }
-
     window.removerJogo = async (id) => {
         if (!isAdmin) return;
         if (!confirm('Remover este jogo?')) return;
@@ -707,8 +499,7 @@
     // Inicialização
     if (isAdmin) {
         fetchCategorias()
-            .then(() => fetchJogos())
-            .then(() => fetchConteudos());
+            .then(() => fetchJogos());
     } else {
         fetchJogos();
     }
