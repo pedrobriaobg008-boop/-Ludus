@@ -2,6 +2,39 @@
 
 Sistema de gerenciamento educacional com jogos.
 
+## Executar com Docker (painel + MongoDB + Mongo Express)
+
+Esta configuração sobe o painel administrativo deste repositório, um MongoDB local persistente e o Mongo Express para administrar o banco no navegador.
+
+1. Instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) e deixe-o em execução.
+2. Crie sua configuração local a partir do modelo:
+
+   ```powershell
+   Copy-Item .env.docker.example .env.docker
+   ```
+
+3. Edite `.env.docker`. Troque todas as senhas, o `SESSION_SECRET` e mantenha a mesma senha em `MONGO_URI`, `ME_CONFIG_MONGODB_URL` e `MONGO_INITDB_ROOT_PASSWORD`.
+4. Inicie os serviços:
+
+   ```powershell
+   docker compose up --build -d
+   ```
+
+5. Acesse:
+
+   - Painel administrativo: http://localhost:3000
+   - Mongo Express: http://localhost:8081 (use `ME_CONFIG_BASICAUTH_USERNAME` e `ME_CONFIG_BASICAUTH_PASSWORD`)
+
+O banco fica no volume Docker `mongo_data`, portanto os dados continuam existindo após `docker compose down`. Para acompanhar os logs, use `docker compose logs -f`. Para parar os serviços, use `docker compose down`.
+
+Defina as credenciais antes da primeira inicialização: o MongoDB só aplica `MONGO_INITDB_ROOT_*` quando o volume está vazio. Para recriar o banco do zero (isso apaga todos os dados), use `docker compose down -v` e suba os serviços novamente.
+
+> O MongoDB e o Mongo Express estão vinculados a `127.0.0.1`: não ficam acessíveis por outros dispositivos da rede. Não publique o Mongo Express diretamente na internet; em produção, use HTTPS e uma camada adicional de autenticação/rede privada.
+
+### Adicionar o site público
+
+Este repositório contém apenas o painel administrativo. Quando o código do site público estiver em uma pasta como `./site`, adicione outro serviço ao `docker-compose.yml`, com seu próprio Dockerfile, conectado à mesma rede Docker. Ele deve se conectar ao banco usando o host `mongo` (nunca `localhost`) e a URI interna definida em `MONGO_URI`.
+
 ## Configuração no Vercel
 
 ### Variáveis de Ambiente Obrigatórias

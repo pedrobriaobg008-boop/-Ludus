@@ -37,14 +37,19 @@ app.set('view engine', 'ejs');
 app.use(express.static(join(__dirname, '../public')));
 app.set('views', join(__dirname, '../views'));
 
+// Em desenvolvimento local, o painel usa HTTP. Em produção, o padrão segue
+// sendo HTTPS, exceto se COOKIE_SECURE for definido explicitamente.
+const useSecureCookies = process.env.COOKIE_SECURE === 'true'
+  || (process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE !== 'false');
+
 // Sessões baseadas em cookie (compatível com serverless)
 app.use(
   session({
     name: 'sid',
     keys: [process.env.SESSION_SECRET || 'dev-secret'],
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: useSecureCookies,
+    sameSite: useSecureCookies ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   })
 );

@@ -1,0 +1,42 @@
+services:
+  admin:
+    build:
+      context: .
+    env_file:
+      - .env.docker
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:8
+    env_file:
+      - .env.docker
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1.0.2-20
+    env_file:
+      - .env.docker
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MONGO_EXPRESS_PORT:-8081}:8081"
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
