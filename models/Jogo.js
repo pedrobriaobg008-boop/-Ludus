@@ -5,6 +5,8 @@ const JogoSchema = new mongoose.Schema({
   descricao: { type: String },
   identificacao_unity: { type: String, required: true },
   link_jogar: { type: String },
+  // URL gerada quando o build ZIP é publicado no diretório público.
+  game_public_path: { type: String },
   video_demo_url: { type: String },
   github_url: { type: String },
   // Novo campo: armazenar o ícone diretamente no documento como Buffer

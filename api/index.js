@@ -1,9 +1,16 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, normalize, relative, sep } from 'path';
+import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { tmpdir } from 'os';
+import { lookup } from 'dns/promises';
+import { isIP } from 'net';
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import multer from 'multer';
+import unzipper from 'unzipper';
 import dotenv from 'dotenv';
 import session from 'cookie-session';
 
@@ -80,6 +87,105 @@ const uploadPdf = multer({
   fileFilter: pdfFileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+
+const GAME_ARCHIVE_MAX_BYTES = Number(process.env.GAME_ARCHIVE_MAX_BYTES || 200 * 1024 * 1024);
+const GAME_ARCHIVE_MAX_FILES = Number(process.env.GAME_ARCHIVE_MAX_FILES || 5000);
+const GAME_ARCHIVE_MAX_UNCOMPRESSED_BYTES = Number(process.env.GAME_ARCHIVE_MAX_UNCOMPRESSED_BYTES || 500 * 1024 * 1024);
+const gamePublicDir = process.env.GAME_PUBLIC_DIR || join(__dirname, '../public/jogos-publicados');
+
+const isZipFile = (file) => file.mimetype === 'application/zip'
+  || file.mimetype === 'application/x-zip-compressed'
+  || /\.zip$/i.test(file.originalname || '');
+const gameUploadFilter = (_req, file, cb) => {
+  if (file.fieldname === 'icone') return imageFileFilter(_req, file, cb);
+  if (file.fieldname === 'arquivo_jogo' && isZipFile(file)) return cb(null, true);
+  cb(new Error('Envie uma imagem no campo ícone e um arquivo ZIP no campo do jogo'), false);
+};
+const uploadGame = multer({ storage: multer.memoryStorage(), fileFilter: gameUploadFilter, limits: { fileSize: GAME_ARCHIVE_MAX_BYTES, files: 2 } }).fields([
+  { name: 'icone', maxCount: 1 }, { name: 'arquivo_jogo', maxCount: 1 }
+]);
+const getUploadedFile = (req, fieldName) => req.files?.[fieldName]?.[0];
+const slugify = (value) => String(value || 'jogo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'jogo';
+const isPrivateIp = (address) => {
+  if (address === '::1' || address === '::' || address.startsWith('fe80:') || address.startsWith('fc') || address.startsWith('fd')) return true;
+  if (isIP(address) !== 4) return false;
+  const [a, b] = address.split('.').map(Number);
+  return a === 10 || a === 127 || a === 0 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+};
+async function validateGameSourceUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { throw new Error('Informe uma URL válida para o arquivo do jogo'); }
+  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('A URL deve usar HTTP(S), sem credenciais');
+  const addresses = await lookup(url.hostname, { all: true });
+  if (!addresses.length || addresses.some(({ address }) => isPrivateIp(address))) throw new Error('URLs internas ou locais não são permitidas');
+  return url;
+}
+async function downloadGameArchive(sourceUrl) {
+  let url = await validateGameSourceUrl(sourceUrl);
+  for (let redirects = 0; redirects <= 3; redirects += 1) {
+    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(60_000) });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('location');
+      if (!location || redirects === 3) throw new Error('A URL excedeu o limite de redirecionamentos');
+      url = await validateGameSourceUrl(new URL(location, url).toString());
+      continue;
+    }
+    if (!response.ok || !response.body) throw new Error(`Não foi possível baixar o arquivo (HTTP ${response.status})`);
+    const length = Number(response.headers.get('content-length') || 0);
+    if (length && length > GAME_ARCHIVE_MAX_BYTES) throw new Error('O arquivo do jogo excede o limite permitido');
+    const reader = response.body.getReader(); const chunks = []; let total = 0;
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      total += value.byteLength;
+      if (total > GAME_ARCHIVE_MAX_BYTES) throw new Error('O arquivo do jogo excede o limite permitido');
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks);
+  }
+  throw new Error('Não foi possível baixar o arquivo');
+}
+async function publishGameArchive(buffer, gameName, gameId) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer.readUInt32LE(0) !== 0x04034b50) throw new Error('O arquivo informado não é um ZIP válido');
+  const archive = await unzipper.Open.buffer(buffer);
+  if (!archive.files.length || archive.files.length > GAME_ARCHIVE_MAX_FILES) throw new Error('O ZIP possui uma quantidade inválida de arquivos');
+  let uncompressedSize = 0;
+  const tempRoot = await mkdtemp(join(tmpdir(), 'ludus-game-'));
+  const extractedRoot = join(tempRoot, 'conteudo');
+  const destinationName = `${slugify(gameName)}-${String(gameId)}`;
+  const destination = join(gamePublicDir, destinationName);
+  const htmlFiles = [];
+  try {
+    await mkdir(extractedRoot, { recursive: true });
+    for (const entry of archive.files) {
+      const entryPath = entry.path.replace(/\\/g, '/');
+      const outputPath = normalize(join(extractedRoot, entryPath));
+      if (!entryPath || entryPath.startsWith('/') || entryPath.includes('\0') || relative(extractedRoot, outputPath).startsWith('..') || relative(extractedRoot, outputPath).includes(`${sep}..${sep}`)) throw new Error('O ZIP contém um caminho de arquivo inválido');
+      if (entry.type === 'Directory') { await mkdir(outputPath, { recursive: true }); continue; }
+      if (entry.type !== 'File' || ((entry.externalFileAttributes >>> 16) & 0o170000) === 0o120000) throw new Error('O ZIP contém um tipo de arquivo não permitido');
+      uncompressedSize += entry.uncompressedSize || 0;
+      if (uncompressedSize > GAME_ARCHIVE_MAX_UNCOMPRESSED_BYTES) throw new Error('O conteúdo descompactado excede o limite permitido');
+      await mkdir(dirname(outputPath), { recursive: true });
+      await pipeline(entry.stream(), createWriteStream(outputPath, { flags: 'wx' }));
+      if (/^index\.html?$/i.test(entryPath) || /\/index\.html?$/i.test(entryPath)) htmlFiles.push(entryPath);
+    }
+    if (!htmlFiles.length) throw new Error('O ZIP precisa conter um arquivo index.html');
+    const indexFile = htmlFiles.sort((a, b) => a.length - b.length)[0];
+    await mkdir(gamePublicDir, { recursive: true });
+    const backup = `${destination}.backup-${Date.now()}`; let hasBackup = false;
+    try { await stat(destination); await rename(destination, backup); hasBackup = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await rename(extractedRoot, destination); if (hasBackup) await rm(backup, { recursive: true, force: true }); }
+    catch (error) { if (hasBackup) await rename(backup, destination).catch(() => {}); throw error; }
+    return `/jogos-publicados/${encodeURIComponent(destinationName)}/${indexFile.split('/').map(encodeURIComponent).join('/')}`;
+  } finally { await rm(tempRoot, { recursive: true, force: true }).catch(() => {}); }
+}
+async function removePublishedGame(publicPath) {
+  if (!publicPath || !publicPath.startsWith('/jogos-publicados/')) return;
+  const folder = decodeURIComponent(publicPath.slice('/jogos-publicados/'.length).split('/')[0]);
+  if (!/^[a-z0-9-]+$/i.test(folder)) return;
+  const target = join(gamePublicDir, folder);
+  if (relative(gamePublicDir, target).startsWith('..')) return;
+  await rm(target, { recursive: true, force: true });
+}
 
 // Conectar ao MongoDB
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
@@ -544,16 +650,17 @@ app.delete('/api/categorias/:id', requireAdmin, async (req, res) => {
 });
 
 // ---- Jogos (admin) ----
-app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, res) => {
+app.post('/api/jogos', requireAdmin, uploadGame, async (req, res) => {
   try {
     const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url, ativo } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
     const jogoData = { nome, descricao, identificacao_unity, createdBy, ativo: ativo === undefined ? true : String(ativo) !== 'false' };
-    if (req.file) {
+    const icone = getUploadedFile(req, 'icone');
+    if (icone) {
       // Salva o buffer diretamente no documento e gera data URL para o front
-      jogoData.icone = req.file.buffer;
-      jogoData.icone_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      jogoData.icone = icone.buffer;
+      jogoData.icone_url = `data:${icone.mimetype};base64,${icone.buffer.toString('base64')}`;
       jogoData.icone_id = null;
     }
     
@@ -566,6 +673,19 @@ app.post('/api/jogos', requireAdmin, uploadImage.single('icone'), async (req, re
     if (categoriasArr.length) jogoData.categorias = categoriasArr;
     
     const jogo = await Jogo.create(jogoData);
+    try {
+      const arquivoJogo = getUploadedFile(req, 'arquivo_jogo');
+      const urlArquivoJogo = String(req.body.url_arquivo_jogo || '').trim();
+      if (arquivoJogo || urlArquivoJogo) {
+        const archive = arquivoJogo?.buffer || await downloadGameArchive(urlArquivoJogo);
+        jogo.link_jogar = await publishGameArchive(archive, jogo.nome, jogo._id);
+        jogo.game_public_path = jogo.link_jogar;
+        await jogo.save();
+      }
+    } catch (error) {
+      await jogo.deleteOne().catch(() => {});
+      throw error;
+    }
     res.status(201).json(jogo);
   } catch (err) {
     console.error(err);
@@ -580,7 +700,7 @@ app.get('/api/jogos', async (req, res) => {
   res.json(jogos);
 });
 
-app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req, res) => {
+app.put('/api/jogos/:id', requireAdmin, uploadGame, async (req, res) => {
   try {
     const jogo = await Jogo.findById(req.params.id);
     if (!jogo) return notFound(res);
@@ -599,13 +719,23 @@ app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req,
     const categoriasArr = toIdArray(categorias);
     if (categorias !== undefined) jogo.categorias = categoriasArr;
     
-    if (req.file) {
+    const icone = getUploadedFile(req, 'icone');
+    if (icone) {
       // Salva buffer direto no documento e atualiza icone_url com data URL
-      jogo.icone = req.file.buffer;
-      jogo.icone_url = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      jogo.icone = icone.buffer;
+      jogo.icone_url = `data:${icone.mimetype};base64,${icone.buffer.toString('base64')}`;
       jogo.icone_id = null;
     }
     
+    const arquivoJogo = getUploadedFile(req, 'arquivo_jogo');
+    const urlArquivoJogo = String(req.body.url_arquivo_jogo || '').trim();
+    if (arquivoJogo || urlArquivoJogo) {
+      const previousPublicPath = jogo.game_public_path;
+      const archive = arquivoJogo?.buffer || await downloadGameArchive(urlArquivoJogo);
+      jogo.link_jogar = await publishGameArchive(archive, jogo.nome, jogo._id);
+      jogo.game_public_path = jogo.link_jogar;
+      if (previousPublicPath && previousPublicPath !== jogo.game_public_path) await removePublishedGame(previousPublicPath);
+    }
     await jogo.save();
     res.json(jogo);
   } catch (err) {
@@ -617,6 +747,7 @@ app.put('/api/jogos/:id', requireAdmin, uploadImage.single('icone'), async (req,
 app.delete('/api/jogos/:id', requireAdmin, async (req, res) => {
   const deleted = await Jogo.findByIdAndDelete(req.params.id);
   if (!deleted) return notFound(res);
+  await removePublishedGame(deleted.game_public_path).catch((error) => console.error('Não foi possível remover arquivos publicados do jogo:', error));
   res.json({ ok: true });
 });
 
@@ -869,6 +1000,15 @@ app.delete('/api/jogadores/:id', async (req, res) => {
 // ============ FIM ROTAS ============
 
 // Exporta o handler compatível com Vercel
+app.use((error, req, res, next) => {
+  if (!error) return next();
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'O arquivo excede o limite permitido' : `Falha no envio: ${error.message}` });
+  }
+  if (req.originalUrl.startsWith('/api/')) return res.status(400).json({ error: error.message || 'Falha ao processar o arquivo enviado' });
+  next(error);
+});
+
 export default app;
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

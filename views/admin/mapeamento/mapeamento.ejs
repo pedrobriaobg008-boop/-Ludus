@@ -68,6 +68,17 @@
                     <div class="field">
                         <label>Link para jogar</label>
                         <input type="url" id="link_jogar" placeholder="https://...">
+                        <p class="small-note">Use para jogos já hospedados. O envio abaixo gera este link automaticamente.</p>
+                    </div>
+                    <div class="field">
+                        <label>Arquivo do jogo (.zip)</label>
+                        <input type="file" id="arquivo_jogo" accept=".zip,application/zip,application/x-zip-compressed">
+                        <p class="small-note">Envie o ZIP do build, contendo um <code>index.html</code>. Máximo: 200 MB.</p>
+                    </div>
+                    <div class="field">
+                        <label>ou link para o arquivo ZIP</label>
+                        <input type="url" id="url_arquivo_jogo" placeholder="https://servidor.example/jogo.zip">
+                        <p class="small-note">O painel baixa, valida e publica o ZIP. Se preencher os dois, o arquivo enviado tem prioridade.</p>
                     </div>
                     <div class="field">
                         <label>Categorias (opcional)</label>
@@ -225,6 +236,8 @@
         submitLabel.textContent = 'Salvar';
         cancelEditBtn.style.display = 'none';
         document.getElementById('iconPreview').style.display = 'none';
+        document.getElementById('arquivo_jogo').value = '';
+        document.getElementById('url_arquivo_jogo').value = '';
         if (categoriasSelect) [...categoriasSelect.options].forEach(opt => opt.selected = false);
         if (videoInput) videoInput.value = '';
         if (githubInput) githubInput.value = '';
@@ -307,6 +320,8 @@
         document.getElementById('identificacao_unity').value = j.identificacao_unity || '';
         document.getElementById('link_jogar').value = j.link_jogar || '';
         document.getElementById('icone').value = '';
+        document.getElementById('arquivo_jogo').value = '';
+        document.getElementById('url_arquivo_jogo').value = '';
         videoInput.value = j.video_demo_url || '';
         githubInput.value = j.github_url || '';
         setSelectedCategorias((j.categorias || []).map(c => c._id || c));
@@ -351,6 +366,10 @@
         formData.append('descricao', descVal);
         formData.append('identificacao_unity', unityVal);
         formData.append('link_jogar', document.getElementById('link_jogar').value.trim());
+        const arquivoJogoInput = document.getElementById('arquivo_jogo');
+        const urlArquivoJogo = document.getElementById('url_arquivo_jogo').value.trim();
+        if (arquivoJogoInput.files.length > 0) formData.append('arquivo_jogo', arquivoJogoInput.files[0]);
+        if (urlArquivoJogo) formData.append('url_arquivo_jogo', urlArquivoJogo);
         const videoVal = videoInput.value.trim();
         if (videoVal) formData.append('video_demo_url', videoVal);
         const githubVal = githubInput.value.trim();
