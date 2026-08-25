@@ -23,13 +23,13 @@ Esta configuração sobe o painel administrativo deste repositório, um MongoDB 
 5. Acesse:
 
    - Painel administrativo: http://localhost:3000
-   - Mongo Express: http://localhost:8081 (use `ME_CONFIG_BASICAUTH_USERNAME` e `ME_CONFIG_BASICAUTH_PASSWORD`)
+   - Interface do banco: http://localhost:3000/database/ (requer login no painel com perfil administrador)
 
 O banco fica no volume Docker `mongo_data`, portanto os dados continuam existindo após `docker compose down`. Para acompanhar os logs, use `docker compose logs -f`. Para parar os serviços, use `docker compose down`.
 
 Defina as credenciais antes da primeira inicialização: o MongoDB só aplica `MONGO_INITDB_ROOT_*` quando o volume está vazio. Para recriar o banco do zero (isso apaga todos os dados), use `docker compose down -v` e suba os serviços novamente.
 
-> O MongoDB e o Mongo Express estão vinculados a `127.0.0.1`: não ficam acessíveis por outros dispositivos da rede. Não publique o Mongo Express diretamente na internet; em produção, use HTTPS e uma camada adicional de autenticação/rede privada.
+> O MongoDB fica vinculado a `127.0.0.1` e o Mongo Express não publica porta local: ele só é acessado via `/database/` no painel, após autenticação de sessão e validação de perfil administrador.
 
 ### Adicionar o site público
 

@@ -31,11 +31,12 @@ services:
     image: mongo-express:1.0.2-20
     env_file:
       - .env.docker
+    environment:
+      ME_CONFIG_SITE_BASEURL: /database/
+      ME_CONFIG_BASICAUTH_ENABLED: "true"
     depends_on:
       mongo:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:${MONGO_EXPRESS_PORT:-8081}:8081"
     restart: unless-stopped
 
 volumes:
