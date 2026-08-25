@@ -6,6 +6,7 @@ import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+import http from 'http';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
@@ -35,8 +36,12 @@ const app = express();
 // Necessário para que cookies "secure" funcionem atrás do proxy do Vercel/HTTPS
 app.set('trust proxy', 1);
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// O Mongo Express recebe requisições via proxy abaixo. Não consuma seu corpo
+// aqui, pois ele precisa ser encaminhado intacto (inclusive em formulários).
+const urlencodedParser = express.urlencoded({ extended: true });
+const jsonParser = express.json();
+app.use((req, res, next) => (req.path.startsWith('/database') ? next() : urlencodedParser(req, res, next)));
+app.use((req, res, next) => (req.path.startsWith('/database') ? next() : jsonParser(req, res, next)));
 app.set('view engine', 'ejs');
 
 // Servir arquivos estáticos
@@ -300,6 +305,43 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+// O Mongo Express não conhece os usuários do Ludus: ele só suporta um login
+// Basic estático. Este proxy usa a sessão do painel e só encaminha usuários
+// administradores, mantendo as credenciais técnicas dentro da rede Docker.
+const proxyMongoExpress = (req, res, next) => {
+  const username = process.env.ME_CONFIG_BASICAUTH_USERNAME;
+  const password = process.env.ME_CONFIG_BASICAUTH_PASSWORD;
+  if (!username || !password) {
+    return res.status(503).send('A interface do banco não está configurada.');
+  }
+
+  const upstream = http.request({
+    hostname: process.env.MONGO_EXPRESS_HOST || 'mongo-express',
+    port: Number(process.env.MONGO_EXPRESS_INTERNAL_PORT || 8081),
+    method: req.method,
+    path: req.originalUrl,
+    headers: {
+      ...req.headers,
+      host: 'mongo-express:8081',
+      authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+      'x-forwarded-host': req.get('host') || '',
+      'x-forwarded-proto': req.protocol,
+    },
+  }, (upstreamRes) => {
+    res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+    upstreamRes.pipe(res);
+  });
+
+  upstream.on('error', (error) => {
+    if (res.headersSent) return res.destroy(error);
+    console.error('Falha ao acessar Mongo Express:', error.message);
+    res.status(502).send('A interface do banco está indisponível.');
+  });
+  req.pipe(upstream);
+};
+
+app.use('/database', requireAuthView, requireAdmin, proxyMongoExpress);
 
 const getUserId = (req) => req.session?.user?.id;
 const isOwner = (createdBy, userId) => createdBy && userId && String(createdBy) === String(userId);
