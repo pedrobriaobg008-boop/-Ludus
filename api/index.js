@@ -8,7 +8,7 @@ import { tmpdir } from 'os';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import unzipper from 'unzipper';
 import dotenv from 'dotenv';
