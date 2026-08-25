@@ -4,7 +4,6 @@ import { dirname, join, normalize, relative, sep } from 'path';
 import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
-import { tmpdir } from 'os';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import mongoose from 'mongoose';
@@ -149,7 +148,10 @@ async function publishGameArchive(buffer, gameName, gameId) {
   const archive = await unzipper.Open.buffer(buffer);
   if (!archive.files.length || archive.files.length > GAME_ARCHIVE_MAX_FILES) throw new Error('O ZIP possui uma quantidade inválida de arquivos');
   let uncompressedSize = 0;
-  const tempRoot = await mkdtemp(join(tmpdir(), 'ludus-game-'));
+  // O diretório temporário precisa ficar no mesmo volume do destino. Em Docker,
+  // /tmp e o volume de jogos são sistemas de arquivos distintos (EXDEV no rename).
+  await mkdir(gamePublicDir, { recursive: true });
+  const tempRoot = await mkdtemp(join(gamePublicDir, '.upload-'));
   const extractedRoot = join(tempRoot, 'conteudo');
   const destinationName = `${slugify(gameName)}-${String(gameId)}`;
   const destination = join(gamePublicDir, destinationName);
@@ -170,7 +172,6 @@ async function publishGameArchive(buffer, gameName, gameId) {
     }
     if (!htmlFiles.length) throw new Error('O ZIP precisa conter um arquivo index.html');
     const indexFile = htmlFiles.sort((a, b) => a.length - b.length)[0];
-    await mkdir(gamePublicDir, { recursive: true });
     const backup = `${destination}.backup-${Date.now()}`; let hasBackup = false;
     try { await stat(destination); await rename(destination, backup); hasBackup = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
     try { await rename(extractedRoot, destination); if (hasBackup) await rm(backup, { recursive: true, force: true }); }

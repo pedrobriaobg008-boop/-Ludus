@@ -229,6 +229,18 @@
         setTimeout(() => field?.focus({ preventScroll: true }), 350);
     }
 
+    async function readApiResponse(response) {
+        const body = await response.text();
+        try {
+            return body ? JSON.parse(body) : {};
+        } catch {
+            if (response.status === 413) {
+                return { error: 'O arquivo é maior que o limite do Vercel. Publique o painel no servidor Docker para enviar jogos ZIP.' };
+            }
+            return { error: `O servidor respondeu com HTTP ${response.status}. Verifique os logs da implantação.` };
+        }
+    }
+
     function resetForm() {
         if (!form) return;
         form.reset();
@@ -397,7 +409,7 @@
                 body: formData,
                 credentials: 'same-origin'
             });
-            const data = await res.json();
+            const data = await readApiResponse(res);
             console.log('Resposta da API:', data); // Debug
             if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
             showMessage('success', isEdit ? 'Jogo atualizado' : 'Jogo criado');
