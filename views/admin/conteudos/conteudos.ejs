@@ -65,7 +65,7 @@
                     <div class="field full"><label for="descricao">Descrição *</label><textarea id="descricao" required></textarea></div>
                     <div class="field"><label for="dataPostagem">Data de postagem</label><input id="dataPostagem" type="date"></div>
                     <div class="field"><label for="linkExterno">Link externo</label><input id="linkExterno" type="url" placeholder="https://..."></div>
-                    <div class="field"><label for="arquivoPdf">Arquivo PDF</label><input id="arquivoPdf" type="file" accept="application/pdf"><p class="hint">Em uma edição, o novo arquivo substitui o PDF atual.</p></div>
+                    <div class="field"><label for="arquivoPdf">Arquivo PDF</label><input id="arquivoPdf" type="file" accept="application/pdf"><p class="hint">Tamanho máximo: 15 MB. Em uma edição, o novo arquivo substitui o PDF atual.</p></div>
                     <div class="field"><label for="jogos">Jogos relacionados</label><select id="jogos" multiple size="5"></select><p class="hint">Use Ctrl/Cmd para selecionar mais de um jogo.</p></div>
                 </div>
                 <div class="actions"><button class="btn btn-primary" id="submitButton" type="submit">Salvar conteúdo</button><button class="btn btn-secondary" id="cancelButton" type="button" hidden>Cancelar edição</button></div>
@@ -95,6 +95,7 @@
     const toast = document.getElementById('toast');
     let conteudos = [];
     let toastTimer;
+    const maxPdfBytes = 15 * 1024 * 1024;
 
     const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
     function showMessage(type, message) { toast.textContent = message; toast.className = `toast ${type} show`; clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 3200); }
@@ -139,6 +140,7 @@
     cancelButton.addEventListener('click', resetForm);
     form.addEventListener('submit', async event => {
         event.preventDefault(); if (!titulo.value.trim() || !descricao.value.trim()) return showMessage('error', 'Título e descrição são obrigatórios.');
+        if (arquivoPdf.files[0]?.size > maxPdfBytes) return showMessage('error', 'O arquivo PDF excede o limite de 15 MB.');
         const body = new FormData(); body.append('titulo', titulo.value.trim()); body.append('descricao', descricao.value.trim()); body.append('tipo', tipo.value); body.append('data_postagem', dataPostagem.value); body.append('link_externo', linkExterno.value.trim()); selectedGameIds().forEach(id => body.append('jogos', id)); if (arquivoPdf.files[0]) body.append('arquivo_pdf', arquivoPdf.files[0]);
         const editing = Boolean(idInput.value);
         try { const response = await fetch(editing ? `/api/conteudos/${idInput.value}` : '/api/conteudos', { method:editing ? 'PUT' : 'POST', body, credentials:'same-origin' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao salvar conteúdo'); showMessage('success', editing ? 'Conteúdo atualizado.' : 'Conteúdo cadastrado.'); resetForm(); await loadConteudos(); }

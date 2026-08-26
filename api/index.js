@@ -86,10 +86,11 @@ const uploadImage = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
+const ARTICLE_PDF_MAX_BYTES = Number(process.env.ARTICLE_PDF_MAX_BYTES || 15 * 1024 * 1024);
 const uploadPdf = multer({
   storage: pdfStorage,
   fileFilter: pdfFileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: ARTICLE_PDF_MAX_BYTES }
 });
 
 const GAME_ARCHIVE_MAX_BYTES = Number(process.env.GAME_ARCHIVE_MAX_BYTES || 200 * 1024 * 1024);

@@ -57,6 +57,9 @@ ADMIN_SEED_TOKEN=seu_token_secreto_aqui
 
 # Ambiente
 NODE_ENV=production
+
+# Tamanho máximo do PDF de artigo em bytes (padrão: 15 MiB)
+ARTICLE_PDF_MAX_BYTES=15728640
 ```
 
 ### Configurações MongoDB Atlas
