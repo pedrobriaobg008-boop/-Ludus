@@ -235,7 +235,7 @@
             return body ? JSON.parse(body) : {};
         } catch {
             if (response.status === 413) {
-                return { error: 'O arquivo é maior que o limite do Vercel. Publique o painel no servidor Docker para enviar jogos ZIP.' };
+                return { error: 'O arquivo excede o limite de upload configurado no servidor.' };
             }
             return { error: `O servidor respondeu com HTTP ${response.status}. Verifique os logs da implantação.` };
         }
