@@ -35,11 +35,9 @@ Defina as credenciais antes da primeira inicialização: o MongoDB só aplica `M
 
 Este repositório contém apenas o painel administrativo. Quando o código do site público estiver em uma pasta como `./site`, adicione outro serviço ao `docker-compose.yml`, com seu próprio Dockerfile, conectado à mesma rede Docker. Ele deve se conectar ao banco usando o host `mongo` (nunca `localhost`) e a URI interna definida em `MONGO_URI`.
 
-## Configuração no Vercel
+## Configuração no Docker
 
-### Variáveis de Ambiente Obrigatórias
-
-Configure estas variáveis no painel do Vercel (Settings → Environment Variables):
+Configure as variáveis no arquivo `.env.docker` da pasta raiz:
 
 ```env
 # MongoDB Atlas (obrigatório)
@@ -57,7 +55,7 @@ ADMIN_INSTITUICAO=Ludus
 # Token para seed do admin (proteção)
 ADMIN_SEED_TOKEN=seu_token_secreto_aqui
 
-# Ambiente (automático no Vercel)
+# Ambiente
 NODE_ENV=production
 ```
 
@@ -65,20 +63,10 @@ NODE_ENV=production
 
 1. Acesse [MongoDB Atlas](https://cloud.mongodb.com)
 2. Vá em **Network Access** → Add IP Address
-3. Adicione `0.0.0.0/0` (permite todos os IPs - necessário para Vercel)
-4. Ou adicione os IPs específicos do Vercel se preferir mais segurança
+3. Adicione o IP público do VPS que executa o Docker
+4. Evite liberar `0.0.0.0/0` quando o IP do VPS puder ser usado
 
-### Limitações no Vercel (Serverless)
-
-⚠️ **Uploads de arquivos**:
-- Em produção, uploads são armazenados em memória (temporário) por limitações serverless.
-- Neste projeto é possível armazenar imagens diretamente como `Buffer` em documentos MongoDB (adequado para arquivos pequenos). Para arquivos maiores, prefira S3 ou Blob Storage.
-
-⚠️ **Sessões**:
-- Sessões em memória funcionam mas podem ser perdidas
-- Para produção robusta, considere usar:
-  - Redis (com Upstash)
-  - MongoDB session store
+Os uploads dos jogos ficam no volume Docker `games_public`, compartilhado entre o painel e o site.
 
 ## Desenvolvimento Local
 
@@ -101,39 +89,39 @@ Acesse: http://localhost:3000
 
 ```
 ├── api/
-│   └── index.js          # Handler para Vercel
+│   └── index.js          # Rotas e aplicação do painel
 ├── models/               # Modelos MongoDB
 ├── views/                # Templates EJS
 ├── public/               # Arquivos estáticos
-├── index.js              # Servidor local
-└── vercel.json           # Configuração Vercel
+├── server.js             # Servidor do painel
+└── Dockerfile            # Imagem Docker do painel
 ```
 
-## Deploy
+## Deploy no VPS
 
 ```bash
-git add .
-git commit -m "sua mensagem"
-git push origin main
+git pull origin main
+docker compose up --build -d
+docker compose ps
 ```
 
-O Vercel fará o deploy automaticamente.
+O domínio deve apontar para o VPS, e o proxy reverso deve encaminhar o painel para a porta `3000` e o site para a porta `3001`.
 
 ## Solução de Problemas
 
 ### Erro de conexão MongoDB
 - Verifique se `MONGO_URI` está configurado corretamente
-- Confirme que o IP `0.0.0.0/0` está liberado no MongoDB Atlas
+- Confirme que o IP público do VPS está liberado no MongoDB Atlas
 
 ### Erro de sessão
 - Verifique se `SESSION_SECRET` está configurado
-- Em produção, os cookies precisam de HTTPS (automático no Vercel)
+- Confirme que o domínio está usando HTTPS
 
 ### Página em branco ou erro 500
-- Verifique os logs no Vercel Dashboard
+- Verifique os logs com `docker compose logs --tail=100 admin site`
 - Console.log mostrará erros detalhados
 
 ### Login não funciona
 - Primeiro acesso: use `/seed-admin` para criar admin
 - Verifique se as credenciais estão corretas
-- Verifique logs do Vercel para ver mensagens de erro
+- Verifique os logs com `docker compose logs --tail=100 admin`

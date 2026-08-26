@@ -1,4 +1,3 @@
-// A importação direta permite que o Vercel reconheça este arquivo como app Express.
 import express from 'express';
 import app from './api/index.js';
 

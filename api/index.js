@@ -33,7 +33,7 @@ dotenv.config({ override: true, path: join(__dirname, '../.env') });
 
 const app = express();
 
-// Necessário para que cookies "secure" funcionem atrás do proxy do Vercel/HTTPS
+// Necessário para que cookies "secure" funcionem atrás do proxy HTTPS do domínio.
 app.set('trust proxy', 1);
 
 // O Mongo Express recebe requisições via proxy abaixo. Não consuma seu corpo
@@ -198,8 +198,8 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ludus';
 
 // Validar MONGO_URI em produção
 if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
-  console.error('❌ ERRO: MONGO_URI não configurado no Vercel!');
-  console.error('Configure em: Vercel Dashboard > Settings > Environment Variables');
+  console.error('❌ ERRO: MONGO_URI não configurado no servidor!');
+  console.error('Configure a variável MONGO_URI no ambiente do Docker.');
 }
 
 let isConnected = false;
@@ -210,7 +210,7 @@ const connectDB = async () => {
   }
 
   if (process.env.NODE_ENV === 'production' && !process.env.MONGO_URI) {
-    throw new Error('MONGO_URI não configurado. Configure no Vercel: Settings > Environment Variables');
+    throw new Error('MONGO_URI não configurado. Configure a variável no ambiente do Docker.');
   }
 
   try {
@@ -1042,7 +1042,6 @@ app.delete('/api/jogadores/:id', async (req, res) => {
 
 // ============ FIM ROTAS ============
 
-// Exporta o handler compatível com Vercel
 app.use((error, req, res, next) => {
   if (!error) return next();
   if (error instanceof multer.MulterError) {
