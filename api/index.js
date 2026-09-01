@@ -754,7 +754,6 @@ app.put('/api/jogos/:id', requireAdmin, uploadGame, async (req, res) => {
     if (nome) jogo.nome = nome;
     if (descricao) jogo.descricao = descricao;
     if (identificacao_unity) jogo.identificacao_unity = identificacao_unity;
-    if (link_jogar) jogo.link_jogar = link_jogar;
     if (total_niveis) jogo.total_niveis = total_niveis;
     if (xp_maxima) jogo.xp_maxima = xp_maxima;
     if (video_demo_url !== undefined) jogo.video_demo_url = video_demo_url || undefined;
@@ -773,18 +772,27 @@ app.put('/api/jogos/:id', requireAdmin, uploadGame, async (req, res) => {
     
     const arquivoJogo = getUploadedFile(req, 'arquivo_jogo');
     const urlArquivoJogo = String(req.body.url_arquivo_jogo || '').trim();
+    let publicacaoAnteriorParaRemover = null;
     if (arquivoJogo || urlArquivoJogo) {
       const previousPublicPath = jogo.game_public_path;
       const archive = arquivoJogo?.buffer || await downloadGameArchive(urlArquivoJogo);
       jogo.link_jogar = await publishGameArchive(archive, jogo.nome, jogo._id);
       jogo.game_public_path = jogo.link_jogar;
-      if (previousPublicPath && previousPublicPath !== jogo.game_public_path) await removePublishedGame(previousPublicPath);
+      if (previousPublicPath && previousPublicPath !== jogo.game_public_path) publicacaoAnteriorParaRemover = previousPublicPath;
+    } else if (link_jogar && link_jogar !== jogo.game_public_path) {
+      publicacaoAnteriorParaRemover = jogo.game_public_path;
+      jogo.link_jogar = String(link_jogar).trim();
+      jogo.game_public_path = undefined;
     }
     await jogo.save();
+    if (publicacaoAnteriorParaRemover) {
+      await removePublishedGame(publicacaoAnteriorParaRemover)
+        .catch((error) => console.error('Não foi possível remover a publicação anterior do jogo:', error));
+    }
     res.json(jogo);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erro ao atualizar jogo' });
+    res.status(500).json({ error: err.message || 'Erro ao atualizar jogo' });
   }
 });
 

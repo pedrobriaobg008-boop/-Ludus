@@ -103,14 +103,6 @@
                         </div>
                     </div>
                     <div class="field">
-                        <label>Total de níveis</label>
-                        <input type="number" min="0" id="total_niveis" placeholder="Ex: 12">
-                    </div>
-                    <div class="field">
-                        <label>XP máxima</label>
-                        <input type="number" min="0" id="xp_maxima" placeholder="Ex: 5000">
-                    </div>
-                    <div class="field">
                         <label><input type="checkbox" id="ativo" checked> Exibir jogo na lista</label>
                         <p class="small-note">Desmarque temporariamente para ocultar o jogo dos demais usuários, sem excluí-lo.</p>
                     </div>
@@ -143,14 +135,13 @@
                         <th>Categorias</th>
                         <th>Ícone</th>
                         <% if (isAdmin) { %>
-                        <th>Níveis / XP</th>
                         <th>Status</th>
                         <th style="width:160px;">Ações</th>
                         <% } %>
                     </tr>
                     </thead>
                     <tbody id="jogosBody">
-                    <tr><td colspan="<%= isAdmin ? 9 : 5 %>" style="color:#94a3b8;">Carregando...</td></tr>
+                    <tr><td colspan="<%= isAdmin ? 8 : 5 %>" style="color:#94a3b8;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -194,7 +185,7 @@
 <script>
     const apiBase = '/api/jogos';
     const isAdmin = <%= isAdmin ? 'true' : 'false' %>;
-    const colSpan = isAdmin ? 9 : 5;
+    const colSpan = isAdmin ? 8 : 5;
     const form = document.getElementById('jogoForm');
     const alertBox = document.getElementById('alert');
     const tbody = document.getElementById('jogosBody');
@@ -309,7 +300,6 @@
                         <span style="display:none;font-size:11px;color:#dc2626;">❌ Erro ao carregar</span>
                     ` : '<span style="font-size:11px;color:#94a3b8;">Sem imagem</span>'}
                 </td>
-                ${isAdmin ? `<td>${j.total_niveis || 0} / ${j.xp_maxima || 0}</td>` : ''}
                 ${isAdmin ? `<td><span class="badge" style="background:${j.ativo === false ? '#fee2e2' : '#dcfce7'};color:${j.ativo === false ? '#b91c1c' : '#15803d'};">${j.ativo === false ? 'Desabilitado' : 'Ativo'}</span></td>` : ''}
                 ${isAdmin ? `<td><div class="actions"><button class="btn btn-ghost" onclick='editarJogo(${JSON.stringify(j)})'>Editar</button><button class="btn btn-danger" onclick="removerJogo('${j._id}')">Remover</button></div></td>` : ''}
             </tr>`;
@@ -330,15 +320,16 @@
         document.getElementById('nome').value = j.nome || '';
         document.getElementById('descricao').value = j.descricao || '';
         document.getElementById('identificacao_unity').value = j.identificacao_unity || '';
-        document.getElementById('link_jogar').value = j.link_jogar || '';
+        // O link criado pelo ZIP é um caminho interno e não uma URL editável.
+        // Deixa o campo livre para reenviar o ZIP ou trocar por uma URL externa.
+        const linkGeradoPeloZip = j.game_public_path && j.link_jogar === j.game_public_path;
+        document.getElementById('link_jogar').value = linkGeradoPeloZip ? '' : (j.link_jogar || '');
         document.getElementById('icone').value = '';
         document.getElementById('arquivo_jogo').value = '';
         document.getElementById('url_arquivo_jogo').value = '';
         videoInput.value = j.video_demo_url || '';
         githubInput.value = j.github_url || '';
         setSelectedCategorias((j.categorias || []).map(c => c._id || c));
-        document.getElementById('total_niveis').value = j.total_niveis || '';
-        document.getElementById('xp_maxima').value = j.xp_maxima || '';
         document.getElementById('ativo').checked = j.ativo !== false;
         
         // Mostrar imagem atual se existir
@@ -389,11 +380,6 @@
         const categoriasSelecionadas = categoriasSelect ? [...categoriasSelect.options].filter(o => o.selected).map(o => o.value) : [];
         categoriasSelecionadas.forEach(id => formData.append('categorias', id));
         
-        const totalNiveis = document.getElementById('total_niveis').value.trim();
-        if (totalNiveis) formData.append('total_niveis', totalNiveis);
-        
-        const xpMaxima = document.getElementById('xp_maxima').value.trim();
-        if (xpMaxima) formData.append('xp_maxima', xpMaxima);
         formData.append('ativo', document.getElementById('ativo').checked);
 
         // Adicionar arquivo se selecionado
