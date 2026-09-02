@@ -847,10 +847,35 @@ app.post('/api/conteudos', requireAdmin, uploadPdf.single('arquivo_pdf'), async 
 });
 
 app.get('/api/conteudos', async (req, res) => {
-  const filtro = {};
-  if (req.query.jogo) filtro.jogos = req.query.jogo;
-  const conteudos = await ConteudoRelacionado.find(filtro).populate('jogos', 'nome identificacao_unity');
-  res.json(conteudos);
+  try {
+    const filtro = {};
+    if (req.query.jogo) {
+      if (!mongoose.isValidObjectId(req.query.jogo)) return badRequest(res, 'Jogo inválido');
+      filtro.jogos = new mongoose.Types.ObjectId(req.query.jogo);
+    }
+
+    // A listagem não precisa transferir o PDF inteiro. O lookup também tolera
+    // referências antigas/inválidas em `jogos`, que fariam o populate falhar.
+    const conteudos = await ConteudoRelacionado.aggregate([
+      { $match: filtro },
+      { $set: { has_pdf: { $eq: [{ $type: '$pdf' }, 'binData'] } } },
+      { $project: { pdf: 0 } },
+      {
+        $lookup: {
+          from: Jogo.collection.name,
+          localField: 'jogos',
+          foreignField: '_id',
+          pipeline: [{ $project: { nome: 1, identificacao_unity: 1 } }],
+          as: 'jogos'
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]);
+    res.json(conteudos);
+  } catch (err) {
+    console.error('Erro ao listar conteúdos:', err);
+    res.status(500).json({ error: err.message || 'Erro ao listar conteúdos' });
+  }
 });
 
 app.put('/api/conteudos/:id', requireAdmin, uploadPdf.single('arquivo_pdf'), async (req, res) => {

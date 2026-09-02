@@ -114,14 +114,14 @@
         conteudosBody.innerHTML = conteudos.map(item => {
             const data = item.data_postagem ? new Date(item.data_postagem).toLocaleDateString('pt-BR', { timeZone:'UTC' }) : '';
             const tipoData = [item.tipo, data].filter(Boolean).map(escapeHtml).join(' / ') || '—';
-            const links = [item.link_externo ? `<a href="${escapeHtml(item.link_externo)}" target="_blank" rel="noopener">Externo</a>` : '', (item.pdf || item.pdf_id || item.pdf_url) ? `<a href="/api/conteudos/${item._id}/pdf" target="_blank" rel="noopener">PDF</a>` : ''].filter(Boolean).join('<br>') || '—';
+            const links = [item.link_externo ? `<a href="${escapeHtml(item.link_externo)}" target="_blank" rel="noopener">Externo</a>` : '', (item.has_pdf || item.pdf || item.pdf_id || item.pdf_url) ? `<a href="/api/conteudos/${item._id}/pdf" target="_blank" rel="noopener">PDF</a>` : ''].filter(Boolean).join('<br>') || '—';
             const jogos = (item.jogos || []).map(jogo => escapeHtml(jogo?.nome || jogo?.identificacao_unity || 'Jogo')).join(', ') || '—';
             return `<tr><td><strong>${escapeHtml(item.titulo)}</strong><br><span class="hint">${escapeHtml(item.descricao || '')}</span></td><td>${tipoData}</td><td>${links}</td><td>${jogos}</td><td><button class="btn btn-secondary" type="button" data-edit="${item._id}">Editar</button> <button class="btn btn-danger" type="button" data-delete="${item._id}">Remover</button></td></tr>`;
         }).join('');
     }
     async function loadConteudos() {
         conteudosBody.innerHTML = '<tr><td class="empty" colspan="5">Carregando conteúdos...</td></tr>';
-        try { const response = await fetch('/api/conteudos', { credentials:'same-origin' }); if (!response.ok) throw new Error('Erro ao carregar conteúdos'); conteudos = await response.json(); renderConteudos(); }
+        try { const response = await fetch('/api/conteudos', { credentials:'same-origin' }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Erro ao carregar conteúdos'); conteudos = data; renderConteudos(); }
         catch (error) { conteudosBody.innerHTML = `<tr><td class="empty" colspan="5">${escapeHtml(error.message)}</td></tr>`; }
     }
     function editConteudo(id) {
