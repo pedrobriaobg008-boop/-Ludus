@@ -4,6 +4,8 @@ const JogoSchema = new mongoose.Schema({
   nome: { type: String, required: true },
   descricao: { type: String },
   identificacao_unity: { type: String, required: true },
+  resolucao_largura: { type: Number, default: 1280, min: 240, max: 7680, validate: Number.isInteger },
+  resolucao_altura: { type: Number, default: 800, min: 240, max: 7680, validate: Number.isInteger },
   link_jogar: { type: String },
   // URL gerada quando o build ZIP é publicado no diretório público.
   game_public_path: { type: String },

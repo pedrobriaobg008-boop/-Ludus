@@ -694,8 +694,16 @@ app.delete('/api/categorias/:id', requireAdmin, async (req, res) => {
 });
 
 // ---- Jogos (admin) ----
+function resolucaoValida(body) {
+  return ['resolucao_largura', 'resolucao_altura'].every(campo =>
+    body[campo] === undefined ||
+    ((typeof body[campo] === 'string' || typeof body[campo] === 'number') &&
+      Number.isInteger(Number(body[campo])) && Number(body[campo]) >= 240 && Number(body[campo]) <= 7680));
+}
+
 app.post('/api/jogos', requireAdmin, uploadGame, async (req, res) => {
   try {
+    if (!resolucaoValida(req.body)) return badRequest(res, 'Informe largura e altura inteiras entre 240 e 7680 pixels.');
     const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, createdBy, categorias, video_demo_url, github_url, ativo } = req.body;
     if (!nome || !identificacao_unity) return badRequest(res, 'Nome e identificação são obrigatórios');
     
@@ -716,6 +724,9 @@ app.post('/api/jogos', requireAdmin, uploadGame, async (req, res) => {
     const categoriasArr = toIdArray(categorias);
     if (categoriasArr.length) jogoData.categorias = categoriasArr;
     
+    for (const campo of ['resolucao_largura', 'resolucao_altura']) {
+      if (req.body[campo] !== undefined) jogoData[campo] = Number(req.body[campo]);
+    }
     const jogo = await Jogo.create(jogoData);
     try {
       const arquivoJogo = getUploadedFile(req, 'arquivo_jogo');
@@ -746,11 +757,15 @@ app.get('/api/jogos', async (req, res) => {
 
 app.put('/api/jogos/:id', requireAdmin, uploadGame, async (req, res) => {
   try {
+    if (!resolucaoValida(req.body)) return badRequest(res, 'Informe largura e altura inteiras entre 240 e 7680 pixels.');
     const jogo = await Jogo.findById(req.params.id);
     if (!jogo) return notFound(res);
     
     const { nome, descricao, identificacao_unity, link_jogar, total_niveis, xp_maxima, categorias, video_demo_url, github_url, ativo } = req.body;
     
+    for (const campo of ['resolucao_largura', 'resolucao_altura']) {
+      if (req.body[campo] !== undefined) jogo[campo] = Number(req.body[campo]);
+    }
     if (nome) jogo.nome = nome;
     if (descricao) jogo.descricao = descricao;
     if (identificacao_unity) jogo.identificacao_unity = identificacao_unity;
