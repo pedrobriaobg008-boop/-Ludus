@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
-import { dirname, join, normalize, relative, sep } from 'path';
-import { mkdir, mkdtemp, rename, rm, stat, writeFile } from 'fs/promises';
+import { dirname, extname, join, normalize, relative, sep } from 'path';
+import { mkdir, mkdtemp, readFile, rename, rm, stat } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { lookup } from 'dns/promises';
@@ -26,6 +26,7 @@ import Jogador from '../models/Jogador.js';
 import Categoria from '../models/Categoria.js';
 import ConteudoRelacionado from '../models/ConteudoRelacionado.js';
 import Equipe from '../models/Equipe.js';
+import EquipeFoto from '../models/EquipeFoto.js';
 import { equipeInicial } from '../helpers/equipe-inicial.js';
 
 // GridFS
@@ -102,12 +103,24 @@ const gamePublicDir = process.env.GAME_PUBLIC_DIR || join(__dirname, '../public/
 const teamPhotoDir = join(__dirname, '../public/equipe/integrantes');
 const uploadTeamPhoto = multer({ storage: multer.memoryStorage(), fileFilter: (_req, file, cb) => imageFileFilter(_req, file, cb), limits: { fileSize: 5 * 1024 * 1024, files: 1 } }).single('foto');
 const saveTeamPhoto = async (file) => {
-  const extension = ({ 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' })[file.mimetype];
-  if (!extension) throw new Error('Formato de imagem não permitido');
-  await mkdir(teamPhotoDir, { recursive: true });
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`;
-  await writeFile(join(teamPhotoDir, fileName), file.buffer, { flag: 'wx' });
-  return `/equipe/integrantes/${fileName}`;
+  const imagem = await EquipeFoto.create({ mimeType: file.mimetype, dados: file.buffer });
+  return `/equipe/foto/${imagem._id}`;
+};
+
+const migrarFotoLegada = async (url) => {
+  const match = String(url || '').match(/^\/equipe\/integrantes\/([a-z0-9._-]+\.(?:jpe?g|png|gif|webp))$/i);
+  if (!match) return url;
+  try {
+    const caminho = join(teamPhotoDir, match[1]);
+    const dados = await readFile(caminho);
+    const mimeType = ({ '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' })[extname(caminho).toLowerCase()];
+    if (!mimeType) return url;
+    const imagem = await EquipeFoto.create({ mimeType, dados });
+    return `/equipe/foto/${imagem._id}`;
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('Não foi possível migrar foto antiga da equipe:', err);
+    return url;
+  }
 };
 
 const isZipFile = (file) => file.mimetype === 'application/zip'
@@ -664,10 +677,33 @@ app.get('/api/equipe', requireAdmin, async (_req, res) => {
   try {
     let equipe = await Equipe.findOne().lean();
     if (!equipe) equipe = await Equipe.create(equipeInicial);
+    let alterada = false;
+    for (const secao of equipe.secoes || []) {
+      for (const pessoa of secao.integrantes || []) {
+        const novaFoto = await migrarFotoLegada(pessoa.foto);
+        if (novaFoto !== pessoa.foto) { pessoa.foto = novaFoto; alterada = true; }
+      }
+    }
+    if (alterada) {
+      await Equipe.updateOne({ _id: equipe._id }, { $set: { secoes: equipe.secoes } });
+    }
     res.json(equipe);
   } catch (err) {
     console.error('Erro ao carregar equipe:', err);
     res.status(500).json({ error: 'Erro ao carregar equipe' });
+  }
+});
+
+app.get('/equipe/foto/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.sendStatus(404);
+    const foto = await EquipeFoto.findById(req.params.id).lean();
+    if (!foto) return res.sendStatus(404);
+    const dadosImagem = Buffer.isBuffer(foto.dados) ? foto.dados : Buffer.from(foto.dados?.buffer || foto.dados);
+    res.type(foto.mimeType).send(dadosImagem);
+  } catch (err) {
+    console.error('Erro ao carregar foto da equipe:', err);
+    res.sendStatus(404);
   }
 });
 
@@ -684,6 +720,11 @@ app.post('/api/equipe/foto', requireAdmin, uploadTeamPhoto, async (req, res) => 
 app.delete('/api/equipe/foto', requireAdmin, async (req, res) => {
   try {
     const url = String(req.body.url || '');
+    const id = url.match(/^\/equipe\/foto\/([a-f0-9]{24})$/i)?.[1];
+    if (id) {
+      await EquipeFoto.findByIdAndDelete(id);
+      return res.json({ ok: true });
+    }
     const fileName = url.startsWith('/equipe/integrantes/') ? url.slice('/equipe/integrantes/'.length) : '';
     if (!fileName || fileName !== fileName.split(/[\\/]/).pop()) return badRequest(res, 'Foto inválida');
     await rm(join(teamPhotoDir, fileName), { force: true });
