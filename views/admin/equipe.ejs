@@ -6,15 +6,14 @@
   <title>Equipe do projeto - Ludus</title>
   <link rel="stylesheet" href="/css/style.css">
   <style>
-    .team-admin-section,.team-admin-person{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px;margin:14px 0}
-    .team-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-    .team-admin-field label{display:block;font-size:14px;color:#475569;margin-bottom:6px}
-    .team-admin-field input,.team-admin-field textarea,.team-admin-field select{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font:inherit}
-    .team-admin-field textarea{min-height:76px;resize:vertical}
-    .team-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-    .team-admin-button{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:600}
-    .team-admin-primary{background:#2563eb;color:#fff}.team-admin-secondary{background:#f1f5f9;color:#0f172a}.team-admin-danger{background:#dc2626;color:#fff}
-    .team-admin-alert{padding:10px 12px;border-radius:8px;margin:12px 0;display:none}.team-admin-alert.success{display:block;background:#ecfdf3;color:#15803d}.team-admin-alert.error{display:block;background:#fef2f2;color:#b91c1c}
+    .team-card-admin{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px;margin:14px 0;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+    .team-grid-admin{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+    .team-field label{display:block;font-size:14px;color:#475569;margin-bottom:6px}
+    .team-field input,.team-field textarea,.team-field select{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font:inherit}
+    .team-field textarea{min-height:76px;resize:vertical}.team-photo-preview{width:72px;height:72px;object-fit:cover;border-radius:50%;background:#f1f5f9;display:block;margin:8px 0}
+    .team-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.team-button{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:600}.team-primary{background:#2563eb;color:#fff}.team-secondary{background:#f1f5f9;color:#0f172a}.team-danger{background:#dc2626;color:#fff}
+    .team-alert{padding:10px 12px;border-radius:8px;margin:12px 0;display:none}.team-alert.success,.team-alert.error{display:block}.team-alert.success{background:#ecfdf3;color:#15803d}.team-alert.error{background:#fef2f2;color:#b91c1c}
+    .team-record-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.team-record-heading h3{margin:0}
     @media(max-width:640px){.main-content{padding:24px}}
   </style>
 </head>
@@ -22,97 +21,85 @@
 <div class="container">
   <%- include('../partials/sidebar') %>
   <main class="main-content">
-    <h1>Equipe do projeto</h1>
-    <p>Edite os dados exibidos nos cartões da página pública da equipe.</p>
-    <div id="teamAlert" class="team-admin-alert" role="status"></div>
-    <form id="teamForm">
-      <section class="team-admin-section">
-        <h2>Apresentação</h2>
-        <div class="team-admin-field"><label for="teamDescription">Descrição da equipe</label><textarea id="teamDescription" required></textarea></div>
-      </section>
-      <div id="teamSections"></div>
-      <div class="team-admin-actions">
-        <button type="button" class="team-admin-button team-admin-secondary" id="addSection">Adicionar seção</button>
-        <button type="submit" class="team-admin-button team-admin-primary">Salvar equipe</button>
-      </div>
-    </form>
+    <h1>Integrantes do projeto</h1>
+    <p>Cadastre, edite ou remova os perfis exibidos na equipe pública.</p>
+    <div id="teamAlert" class="team-alert" role="status"></div>
+    <section class="team-card-admin">
+      <h2 id="formTitle">Novo integrante</h2>
+      <form id="personForm">
+        <input type="hidden" id="personId">
+        <div class="team-grid-admin">
+          <div class="team-field"><label for="personName">Nome *</label><input id="personName" required></div>
+          <div class="team-field"><label for="personRole">Cargo *</label><input id="personRole" required></div>
+          <div class="team-field"><label for="personInstitution">Instituição *</label><input id="personInstitution" required></div>
+          <div class="team-field"><label for="personSection">Grupo da equipe *</label><select id="personSection" required></select></div>
+          <div class="team-field"><label for="personBio">Biografia</label><textarea id="personBio"></textarea></div>
+          <div class="team-field"><label for="personPhoto">Foto</label><input id="personPhoto" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><img id="photoPreview" class="team-photo-preview" alt="Prévia da foto" hidden><small id="currentPhoto"></small></div>
+        </div>
+        <div class="team-actions"><button type="submit" class="team-button team-primary" id="savePerson">Salvar integrante</button><button type="button" class="team-button team-secondary" id="cancelEdit" hidden>Cancelar edição</button></div>
+      </form>
+    </section>
+    <h2>Integrantes cadastrados</h2>
+    <div id="peopleList"></div>
   </main>
 </div>
 <script>
-  const form = document.getElementById('teamForm');
-  const sectionsRoot = document.getElementById('teamSections');
+  const form = document.getElementById('personForm');
   const alertBox = document.getElementById('teamAlert');
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const personFields = (person = {}) => `
-    <article class="team-admin-person">
-      <div class="team-admin-grid">
-        <div class="team-admin-field"><label>Nome *</label><input data-person="nome" value="${escapeHtml(person.nome)}" required></div>
-        <div class="team-admin-field"><label>Cargo *</label><input data-person="cargo" value="${escapeHtml(person.cargo)}" required></div>
-        <div class="team-admin-field"><label>Instituição *</label><input data-person="instituicao" value="${escapeHtml(person.instituicao)}" required></div>
-        <div class="team-admin-field"><label>Foto (caminho ou URL)</label><input data-person="foto" value="${escapeHtml(person.foto)}" placeholder="/equipe/nome.jpg"></div>
-        <div class="team-admin-field"><label>Biografia</label><textarea data-person="bio">${escapeHtml(person.bio)}</textarea></div>
-      </div>
-      <div class="team-admin-actions"><button type="button" class="team-admin-button team-admin-danger" data-remove-person>Remover integrante</button></div>
-    </article>`;
-  function renderSection(section = {}) {
-    const wrapper = document.createElement('section');
-    wrapper.className = 'team-admin-section';
-    wrapper.dataset.id = section.id || '';
-    wrapper.innerHTML = `
-      <div class="team-admin-grid">
-        <div class="team-admin-field"><label>Nome da seção *</label><input data-section="titulo" value="${escapeHtml(section.titulo)}" required></div>
-        <div class="team-admin-field"><label>Ícone (caminho ou URL)</label><input data-section="icone" value="${escapeHtml(section.icone)}"></div>
-        <div class="team-admin-field"><label>Cor</label><select data-section="tema"><option value="azul">Azul</option><option value="rosa">Rosa</option></select></div>
-      </div>
-      <div data-people></div>
-      <div class="team-admin-actions"><button type="button" class="team-admin-button team-admin-secondary" data-add-person>Adicionar integrante</button><button type="button" class="team-admin-button team-admin-danger" data-remove-section>Remover seção</button></div>`;
-    wrapper.querySelector('[data-section="tema"]').value = section.tema === 'rosa' ? 'rosa' : 'azul';
-    const people = wrapper.querySelector('[data-people]');
-    (Array.isArray(section.integrantes) ? section.integrantes : []).forEach(person => {
-      const personMarkup = document.createElement('div');
-      personMarkup.innerHTML = personFields(person);
-      personMarkup.firstElementChild.dataset.id = person.id || '';
-      people.append(personMarkup.firstElementChild);
-    });
-    wrapper.addEventListener('click', event => {
-      if (event.target.closest('[data-add-person]')) people.insertAdjacentHTML('beforeend', personFields());
-      if (event.target.closest('[data-remove-person]')) event.target.closest('.team-admin-person').remove();
-      if (event.target.closest('[data-remove-section]')) wrapper.remove();
-    });
-    sectionsRoot.append(wrapper);
+  const list = document.getElementById('peopleList');
+  const photoInput = document.getElementById('personPhoto');
+  let team = null;
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const sectionById = id => team?.secoes.find(section => section.id === id);
+  function message(type, text) { alertBox.textContent = text; alertBox.className = `team-alert ${type}`; }
+  function resetForm() {
+    form.reset(); document.getElementById('personId').value = ''; document.getElementById('formTitle').textContent = 'Novo integrante'; document.getElementById('savePerson').textContent = 'Salvar integrante'; document.getElementById('cancelEdit').hidden = true; document.getElementById('photoPreview').hidden = true; document.getElementById('currentPhoto').textContent = '';
   }
-  async function loadTeam() {
-    const response = await fetch('/api/equipe', { credentials: 'same-origin' });
-    if (!response.ok) throw new Error('Não foi possível carregar os dados da equipe.');
-    const team = await response.json();
-    document.getElementById('teamDescription').value = team.descricao || '';
-    sectionsRoot.replaceChildren();
-    (team.secoes || []).forEach(renderSection);
-  }
-  document.getElementById('addSection').addEventListener('click', () => renderSection());
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const secoes = [...sectionsRoot.children].map((section, sectionIndex) => ({
-      id: section.querySelector('[data-section="titulo"]').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `secao-${sectionIndex + 1}`,
-      titulo: section.querySelector('[data-section="titulo"]').value.trim(),
-      tema: section.querySelector('[data-section="tema"]').value,
-      icone: section.querySelector('[data-section="icone"]').value.trim(),
-      integrantes: [...section.querySelectorAll('.team-admin-person')].map((person, personIndex) => ({
-        id: Number(person.dataset.id) || Date.now() + sectionIndex * 1000 + personIndex,
-        nome: person.querySelector('[data-person="nome"]').value.trim(),
-        cargo: person.querySelector('[data-person="cargo"]').value.trim(),
-        instituicao: person.querySelector('[data-person="instituicao"]').value.trim(),
-        foto: person.querySelector('[data-person="foto"]').value.trim(),
-        bio: person.querySelector('[data-person="bio"]').value.trim()
-      }))
+  function renderPeople() {
+    list.replaceChildren();
+    team.secoes.forEach(section => section.integrantes.forEach(person => {
+      const card = document.createElement('article'); card.className = 'team-card-admin';
+      card.innerHTML = `<div class="team-record-heading"><h3>${esc(person.nome)}</h3><span>${esc(section.titulo)}</span></div><p>${esc(person.cargo)} · ${esc(person.instituicao)}</p><div class="team-actions"><button type="button" class="team-button team-secondary" data-edit>Editar</button><button type="button" class="team-button team-danger" data-delete>Remover</button></div>`;
+      card.querySelector('[data-edit]').addEventListener('click', () => editPerson(section.id, person.id));
+      card.querySelector('[data-delete]').addEventListener('click', () => deletePerson(section.id, person.id));
+      list.append(card);
     }));
-    const response = await fetch('/api/equipe', { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({descricao:document.getElementById('teamDescription').value.trim(), secoes}) });
-    const result = await response.json().catch(() => ({}));
-    alertBox.textContent = response.ok ? 'Equipe atualizada com sucesso.' : (result.error || 'Não foi possível salvar a equipe.');
-    alertBox.className = `team-admin-alert ${response.ok ? 'success' : 'error'}`;
-    if (response.ok) await loadTeam();
+  }
+  function editPerson(sectionId, personId) {
+    const section = sectionById(sectionId); const person = section?.integrantes.find(item => item.id === personId); if (!person) return;
+    document.getElementById('personId').value = `${sectionId}:${personId}`; document.getElementById('personName').value = person.nome || ''; document.getElementById('personRole').value = person.cargo || ''; document.getElementById('personInstitution').value = person.instituicao || ''; document.getElementById('personBio').value = person.bio || ''; document.getElementById('personSection').value = sectionId; document.getElementById('formTitle').textContent = 'Editar integrante'; document.getElementById('savePerson').textContent = 'Atualizar integrante'; document.getElementById('cancelEdit').hidden = false; document.getElementById('currentPhoto').textContent = person.foto ? 'Foto atual mantida se nenhuma nova for escolhida.' : 'Nenhuma foto cadastrada.'; const preview = document.getElementById('photoPreview'); preview.src = person.foto || ''; preview.hidden = !person.foto; photoInput.value = ''; form.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function saveTeam() { const response = await fetch('/api/equipe', {method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(team)}); const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || 'Não foi possível salvar.'); return data; }
+  async function loadTeam() {
+    const response = await fetch('/api/equipe', {credentials:'same-origin'}); if (!response.ok) throw new Error('Não foi possível carregar a equipe.'); team = await response.json();
+    const sectionSelect = document.getElementById('personSection'); sectionSelect.replaceChildren(...team.secoes.map(section => { const option = document.createElement('option'); option.value = section.id; option.textContent = section.titulo; return option; })); renderPeople();
+  }
+  photoInput.addEventListener('change', () => { const file = photoInput.files[0]; const preview = document.getElementById('photoPreview'); if (file) { preview.src = URL.createObjectURL(file); preview.hidden = false; } });
+  document.getElementById('cancelEdit').addEventListener('click', resetForm);
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); const ref = document.getElementById('personId').value; const [oldSectionId, oldPersonId] = ref ? ref.split(':') : [];
+    const selectedSectionId = document.getElementById('personSection').value; let person = ref ? sectionById(oldSectionId)?.integrantes.find(item => item.id === Number(oldPersonId)) : null;
+    const fotoAnterior = person?.foto || ''; let foto = fotoAnterior;
+    try {
+      const file = photoInput.files[0];
+      if (file) { const data = new FormData(); data.append('foto', file); const upload = await fetch('/api/equipe/foto', {method:'POST',body:data,credentials:'same-origin'}); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error || 'Falha ao enviar a foto.'); foto = uploaded.url; }
+      const updated = {id: person?.id || Date.now(), nome:document.getElementById('personName').value.trim(), cargo:document.getElementById('personRole').value.trim(), instituicao:document.getElementById('personInstitution').value.trim(), bio:document.getElementById('personBio').value.trim(), foto};
+      if (person) sectionById(oldSectionId).integrantes = sectionById(oldSectionId).integrantes.filter(item => item.id !== Number(oldPersonId));
+      sectionById(selectedSectionId).integrantes.push(updated);
+      try { team = await saveTeam(); } catch (saveError) {
+        if (file && foto) await fetch('/api/equipe/foto', {method:'DELETE',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({url:foto})}).catch(()=>{});
+        throw saveError;
+      }
+      if (file && fotoAnterior.startsWith('/equipe/integrantes/')) await fetch('/api/equipe/foto', {method:'DELETE',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({url:fotoAnterior})}).catch(()=>{});
+      resetForm(); renderPeople(); message('success', ref ? 'Integrante atualizado.' : 'Integrante cadastrado.');
+    } catch(error) { message('error', error.message); }
   });
-  loadTeam().catch(error => { alertBox.textContent = error.message; alertBox.className = 'team-admin-alert error'; });
+  async function deletePerson(sectionId, personId) {
+    const section = sectionById(sectionId); const person = section?.integrantes.find(item => item.id === personId); if (!person || !confirm(`Remover ${person.nome} da equipe?`)) return;
+    section.integrantes = section.integrantes.filter(item => item.id !== personId);
+    try { team = await saveTeam(); if (person.foto.startsWith('/equipe/integrantes/')) await fetch('/api/equipe/foto', {method:'DELETE',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({url:person.foto})}).catch(()=>{}); renderPeople(); message('success','Integrante removido.'); } catch(error) { message('error',error.message); await loadTeam(); }
+  }
+  loadTeam().catch(error => message('error',error.message));
 </script>
 </body>
 </html>

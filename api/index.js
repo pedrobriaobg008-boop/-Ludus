@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join, normalize, relative, sep } from 'path';
-import { mkdir, mkdtemp, rename, rm, stat } from 'fs/promises';
+import { mkdir, mkdtemp, rename, rm, stat, writeFile } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { lookup } from 'dns/promises';
@@ -99,6 +99,16 @@ const GAME_ARCHIVE_MAX_BYTES = Number(process.env.GAME_ARCHIVE_MAX_BYTES || 200 
 const GAME_ARCHIVE_MAX_FILES = Number(process.env.GAME_ARCHIVE_MAX_FILES || 5000);
 const GAME_ARCHIVE_MAX_UNCOMPRESSED_BYTES = Number(process.env.GAME_ARCHIVE_MAX_UNCOMPRESSED_BYTES || 500 * 1024 * 1024);
 const gamePublicDir = process.env.GAME_PUBLIC_DIR || join(__dirname, '../public/jogos-publicados');
+const teamPhotoDir = join(__dirname, '../public/equipe/integrantes');
+const uploadTeamPhoto = multer({ storage: multer.memoryStorage(), fileFilter: (_req, file, cb) => imageFileFilter(_req, file, cb), limits: { fileSize: 5 * 1024 * 1024, files: 1 } }).single('foto');
+const saveTeamPhoto = async (file) => {
+  const extension = ({ 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' })[file.mimetype];
+  if (!extension) throw new Error('Formato de imagem não permitido');
+  await mkdir(teamPhotoDir, { recursive: true });
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`;
+  await writeFile(join(teamPhotoDir, fileName), file.buffer, { flag: 'wx' });
+  return `/equipe/integrantes/${fileName}`;
+};
 
 const isZipFile = (file) => file.mimetype === 'application/zip'
   || file.mimetype === 'application/x-zip-compressed'
@@ -658,6 +668,29 @@ app.get('/api/equipe', requireAdmin, async (_req, res) => {
   } catch (err) {
     console.error('Erro ao carregar equipe:', err);
     res.status(500).json({ error: 'Erro ao carregar equipe' });
+  }
+});
+
+app.post('/api/equipe/foto', requireAdmin, uploadTeamPhoto, async (req, res) => {
+  try {
+    if (!req.file) return badRequest(res, 'Selecione uma imagem para enviar');
+    res.status(201).json({ url: await saveTeamPhoto(req.file) });
+  } catch (err) {
+    console.error('Erro ao enviar foto de integrante:', err);
+    res.status(500).json({ error: err.message || 'Erro ao enviar foto' });
+  }
+});
+
+app.delete('/api/equipe/foto', requireAdmin, async (req, res) => {
+  try {
+    const url = String(req.body.url || '');
+    const fileName = url.startsWith('/equipe/integrantes/') ? url.slice('/equipe/integrantes/'.length) : '';
+    if (!fileName || fileName !== fileName.split(/[\\/]/).pop()) return badRequest(res, 'Foto inválida');
+    await rm(join(teamPhotoDir, fileName), { force: true });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao remover foto de integrante:', err);
+    res.status(500).json({ error: 'Erro ao remover foto' });
   }
 });
 
