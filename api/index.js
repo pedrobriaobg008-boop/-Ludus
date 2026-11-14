@@ -25,6 +25,8 @@ import Turma from '../models/Turma.js';
 import Jogador from '../models/Jogador.js';
 import Categoria from '../models/Categoria.js';
 import ConteudoRelacionado from '../models/ConteudoRelacionado.js';
+import Equipe from '../models/Equipe.js';
+import { equipeInicial } from '../helpers/equipe-inicial.js';
 
 // GridFS
 // Nota: migração para armazenamento em documento (Buffer). GridFS removido.
@@ -508,6 +510,10 @@ app.get('/conteudos-admin', requireAuthView, requireAdmin, (req, res) => {
   res.render('admin/conteudos/conteudos', { title: 'Conteúdos Relacionados' });
 });
 
+app.get('/equipe-admin', requireAuthView, requireAdmin, (_req, res) => {
+  res.render('admin/equipe', { title: 'Equipe do projeto' });
+});
+
 app.get('/addcenaok', requireAuthView, (req, res) => {
   res.render('admin/mapeamento/addcenaok', { nomeFase: req.query['nome-fase'] });
 });
@@ -641,6 +647,58 @@ app.delete('/api/usuarios-instituicao/:id', requireAdmin, async (req, res) => {
   const deleted = await Usuario.findByIdAndDelete(req.params.id);
   if (!deleted) return notFound(res);
   res.json({ ok: true });
+});
+
+// ---- Equipe pública do projeto (edição restrita a administradores) ----
+app.get('/api/equipe', requireAdmin, async (_req, res) => {
+  try {
+    let equipe = await Equipe.findOne().lean();
+    if (!equipe) equipe = await Equipe.create(equipeInicial);
+    res.json(equipe);
+  } catch (err) {
+    console.error('Erro ao carregar equipe:', err);
+    res.status(500).json({ error: 'Erro ao carregar equipe' });
+  }
+});
+
+app.put('/api/equipe', requireAdmin, async (req, res) => {
+  try {
+    const descricao = typeof req.body.descricao === 'string' ? req.body.descricao.trim() : '';
+    const secoes = req.body.secoes;
+    if (!descricao || !Array.isArray(secoes)) return badRequest(res, 'Informe a descrição e as seções da equipe');
+
+    const idsIntegrantes = new Set();
+    const secoesNormalizadas = secoes.map((secao, index) => {
+      const integrantes = Array.isArray(secao.integrantes) ? secao.integrantes : [];
+      return {
+        id: String(secao.id || `secao-${index + 1}`).trim(),
+        titulo: String(secao.titulo || '').trim(),
+        tema: secao.tema === 'rosa' ? 'rosa' : 'azul',
+        icone: String(secao.icone || '').trim(),
+        integrantes: integrantes.map((pessoa) => {
+          const nome = String(pessoa.nome || '').trim();
+          const cargo = String(pessoa.cargo || '').trim();
+          const instituicao = String(pessoa.instituicao || '').trim();
+          if (!nome || !cargo || !instituicao) throw new Error('Cada integrante precisa de nome, cargo e instituição');
+          let id = Number(pessoa.id);
+          if (!Number.isInteger(id) || id < 1 || idsIntegrantes.has(id)) {
+            id = 1;
+            while (idsIntegrantes.has(id)) id += 1;
+          }
+          idsIntegrantes.add(id);
+          return { id, nome, cargo, instituicao, foto: String(pessoa.foto || '').trim(), bio: String(pessoa.bio || '').trim() };
+        })
+      };
+    });
+    if (secoesNormalizadas.some((secao) => !secao.titulo)) return badRequest(res, 'Toda seção precisa de um título');
+
+    const equipe = await Equipe.findOneAndUpdate({}, { descricao, secoes: secoesNormalizadas }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+    res.json(equipe);
+  } catch (err) {
+    if (err.message.startsWith('Cada integrante')) return badRequest(res, err.message);
+    console.error('Erro ao salvar equipe:', err);
+    res.status(500).json({ error: 'Erro ao salvar equipe' });
+  }
 });
 
 // ---- Categorias de Jogos (admin) ----

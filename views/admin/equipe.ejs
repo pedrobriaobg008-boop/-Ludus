@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equipe do projeto - Ludus</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .team-admin-section,.team-admin-person{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:18px;margin:14px 0}
+    .team-admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+    .team-admin-field label{display:block;font-size:14px;color:#475569;margin-bottom:6px}
+    .team-admin-field input,.team-admin-field textarea,.team-admin-field select{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font:inherit}
+    .team-admin-field textarea{min-height:76px;resize:vertical}
+    .team-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .team-admin-button{border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:600}
+    .team-admin-primary{background:#2563eb;color:#fff}.team-admin-secondary{background:#f1f5f9;color:#0f172a}.team-admin-danger{background:#dc2626;color:#fff}
+    .team-admin-alert{padding:10px 12px;border-radius:8px;margin:12px 0;display:none}.team-admin-alert.success{display:block;background:#ecfdf3;color:#15803d}.team-admin-alert.error{display:block;background:#fef2f2;color:#b91c1c}
+    @media(max-width:640px){.main-content{padding:24px}}
+  </style>
+</head>
+<body>
+<div class="container">
+  <%- include('../partials/sidebar') %>
+  <main class="main-content">
+    <h1>Equipe do projeto</h1>
+    <p>Edite os dados exibidos nos cartões da página pública da equipe.</p>
+    <div id="teamAlert" class="team-admin-alert" role="status"></div>
+    <form id="teamForm">
+      <section class="team-admin-section">
+        <h2>Apresentação</h2>
+        <div class="team-admin-field"><label for="teamDescription">Descrição da equipe</label><textarea id="teamDescription" required></textarea></div>
+      </section>
+      <div id="teamSections"></div>
+      <div class="team-admin-actions">
+        <button type="button" class="team-admin-button team-admin-secondary" id="addSection">Adicionar seção</button>
+        <button type="submit" class="team-admin-button team-admin-primary">Salvar equipe</button>
+      </div>
+    </form>
+  </main>
+</div>
+<script>
+  const form = document.getElementById('teamForm');
+  const sectionsRoot = document.getElementById('teamSections');
+  const alertBox = document.getElementById('teamAlert');
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const personFields = (person = {}) => `
+    <article class="team-admin-person">
+      <div class="team-admin-grid">
+        <div class="team-admin-field"><label>Nome *</label><input data-person="nome" value="${escapeHtml(person.nome)}" required></div>
+        <div class="team-admin-field"><label>Cargo *</label><input data-person="cargo" value="${escapeHtml(person.cargo)}" required></div>
+        <div class="team-admin-field"><label>Instituição *</label><input data-person="instituicao" value="${escapeHtml(person.instituicao)}" required></div>
+        <div class="team-admin-field"><label>Foto (caminho ou URL)</label><input data-person="foto" value="${escapeHtml(person.foto)}" placeholder="/equipe/nome.jpg"></div>
+        <div class="team-admin-field"><label>Biografia</label><textarea data-person="bio">${escapeHtml(person.bio)}</textarea></div>
+      </div>
+      <div class="team-admin-actions"><button type="button" class="team-admin-button team-admin-danger" data-remove-person>Remover integrante</button></div>
+    </article>`;
+  function renderSection(section = {}) {
+    const wrapper = document.createElement('section');
+    wrapper.className = 'team-admin-section';
+    wrapper.dataset.id = section.id || '';
+    wrapper.innerHTML = `
+      <div class="team-admin-grid">
+        <div class="team-admin-field"><label>Nome da seção *</label><input data-section="titulo" value="${escapeHtml(section.titulo)}" required></div>
+        <div class="team-admin-field"><label>Ícone (caminho ou URL)</label><input data-section="icone" value="${escapeHtml(section.icone)}"></div>
+        <div class="team-admin-field"><label>Cor</label><select data-section="tema"><option value="azul">Azul</option><option value="rosa">Rosa</option></select></div>
+      </div>
+      <div data-people></div>
+      <div class="team-admin-actions"><button type="button" class="team-admin-button team-admin-secondary" data-add-person>Adicionar integrante</button><button type="button" class="team-admin-button team-admin-danger" data-remove-section>Remover seção</button></div>`;
+    wrapper.querySelector('[data-section="tema"]').value = section.tema === 'rosa' ? 'rosa' : 'azul';
+    const people = wrapper.querySelector('[data-people]');
+    (Array.isArray(section.integrantes) ? section.integrantes : []).forEach(person => {
+      const personMarkup = document.createElement('div');
+      personMarkup.innerHTML = personFields(person);
+      personMarkup.firstElementChild.dataset.id = person.id || '';
+      people.append(personMarkup.firstElementChild);
+    });
+    wrapper.addEventListener('click', event => {
+      if (event.target.closest('[data-add-person]')) people.insertAdjacentHTML('beforeend', personFields());
+      if (event.target.closest('[data-remove-person]')) event.target.closest('.team-admin-person').remove();
+      if (event.target.closest('[data-remove-section]')) wrapper.remove();
+    });
+    sectionsRoot.append(wrapper);
+  }
+  async function loadTeam() {
+    const response = await fetch('/api/equipe', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Não foi possível carregar os dados da equipe.');
+    const team = await response.json();
+    document.getElementById('teamDescription').value = team.descricao || '';
+    sectionsRoot.replaceChildren();
+    (team.secoes || []).forEach(renderSection);
+  }
+  document.getElementById('addSection').addEventListener('click', () => renderSection());
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const secoes = [...sectionsRoot.children].map((section, sectionIndex) => ({
+      id: section.querySelector('[data-section="titulo"]').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `secao-${sectionIndex + 1}`,
+      titulo: section.querySelector('[data-section="titulo"]').value.trim(),
+      tema: section.querySelector('[data-section="tema"]').value,
+      icone: section.querySelector('[data-section="icone"]').value.trim(),
+      integrantes: [...section.querySelectorAll('.team-admin-person')].map((person, personIndex) => ({
+        id: Number(person.dataset.id) || Date.now() + sectionIndex * 1000 + personIndex,
+        nome: person.querySelector('[data-person="nome"]').value.trim(),
+        cargo: person.querySelector('[data-person="cargo"]').value.trim(),
+        instituicao: person.querySelector('[data-person="instituicao"]').value.trim(),
+        foto: person.querySelector('[data-person="foto"]').value.trim(),
+        bio: person.querySelector('[data-person="bio"]').value.trim()
+      }))
+    }));
+    const response = await fetch('/api/equipe', { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify({descricao:document.getElementById('teamDescription').value.trim(), secoes}) });
+    const result = await response.json().catch(() => ({}));
+    alertBox.textContent = response.ok ? 'Equipe atualizada com sucesso.' : (result.error || 'Não foi possível salvar a equipe.');
+    alertBox.className = `team-admin-alert ${response.ok ? 'success' : 'error'}`;
+    if (response.ok) await loadTeam();
+  });
+  loadTeam().catch(error => { alertBox.textContent = error.message; alertBox.className = 'team-admin-alert error'; });
+</script>
+</body>
+</html>
