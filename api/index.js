@@ -174,6 +174,24 @@ async function downloadGameArchive(sourceUrl) {
   }
   throw new Error('Não foi possível baixar o arquivo');
 }
+async function versionGameServiceWorkers(rootDir, relativePaths, gameId) {
+  for (const relativePath of relativePaths) {
+    if (!/serviceworker\.js$/i.test(relativePath)) continue;
+    const workerPath = join(rootDir, ...relativePath.split('/'));
+    const source = await readFile(workerPath, 'utf8');
+    const declaration = source.match(/\b(const|let|var)\s+cacheName\s*=\s*(["'])([^"']+)\2\s*;/);
+    if (!declaration) continue;
+
+    const previousName = declaration[3];
+    const stablePrefix = previousName.match(/^(.*)-ludus-publish-[a-z0-9]+-[a-z0-9]+$/i)?.[1]
+      || previousName.replace(/-[^-]+$/, '');
+    const cachePrefix = `${stablePrefix}-ludus-publish-${String(gameId)}`;
+    const cacheName = `${cachePrefix}-${Date.now().toString(36)}`;
+    const updated = source.replace(declaration[0], `${declaration[1]} cacheName = ${JSON.stringify(cacheName)};`)
+      + `\nself.addEventListener('activate', function(event) { event.waitUntil(caches.keys().then(function(keys) { return Promise.all(keys.filter(function(key) { return key.startsWith(${JSON.stringify(`${cachePrefix}-`)}) && key !== cacheName; }).map(function(key) { return caches.delete(key); })); })); });\n`;
+    await writeFile(workerPath, updated, 'utf8');
+  }
+}
 async function publishGameArchive(buffer, gameName, gameId) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer.readUInt32LE(0) !== 0x04034b50) throw new Error('O arquivo informado não é um ZIP válido');
   const archive = await unzipper.Open.buffer(buffer);
@@ -187,6 +205,7 @@ async function publishGameArchive(buffer, gameName, gameId) {
   const destinationName = `${slugify(gameName)}-${String(gameId)}`;
   const destination = join(gamePublicDir, destinationName);
   const htmlFiles = [];
+  const serviceWorkerFiles = [];
   try {
     await mkdir(extractedRoot, { recursive: true });
     for (const entry of archive.files) {
@@ -200,8 +219,10 @@ async function publishGameArchive(buffer, gameName, gameId) {
       await mkdir(dirname(outputPath), { recursive: true });
       await pipeline(entry.stream(), createWriteStream(outputPath, { flags: 'wx' }));
       if (/^index\.html?$/i.test(entryPath) || /\/index\.html?$/i.test(entryPath)) htmlFiles.push(entryPath);
+      if (/^serviceworker\.js$/i.test(entryPath.split('/').pop())) serviceWorkerFiles.push(entryPath);
     }
     if (!htmlFiles.length) throw new Error('O ZIP precisa conter um arquivo index.html');
+    await versionGameServiceWorkers(extractedRoot, serviceWorkerFiles, gameId);
     const indexFile = htmlFiles.sort((a, b) => a.length - b.length)[0];
     const backup = `${destination}.backup-${Date.now()}`; let hasBackup = false;
     try { await stat(destination); await rename(destination, backup); hasBackup = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
