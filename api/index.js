@@ -719,7 +719,9 @@ app.put('/api/equipe', requireAdmin, async (req, res) => {
             while (idsIntegrantes.has(id)) id += 1;
           }
           idsIntegrantes.add(id);
-          return { id, nome, cargo, instituicao, foto: String(pessoa.foto || '').trim(), bio: String(pessoa.bio || '').trim() };
+          const lattes = String(pessoa.lattes || '').trim();
+          if (lattes && (!/^https:\/\//i.test(lattes) || !/^https:\/\/(www\.)?lattes\.cnpq\.br\//i.test(lattes))) throw new Error('O Currículo Lattes deve usar um link https://lattes.cnpq.br/');
+          return { id, nome, cargo, instituicao, foto: String(pessoa.foto || '').trim(), bio: String(pessoa.bio || '').trim(), lattes };
         })
       };
     });
@@ -729,6 +731,7 @@ app.put('/api/equipe', requireAdmin, async (req, res) => {
     res.json(equipe);
   } catch (err) {
     if (err.message.startsWith('Cada integrante')) return badRequest(res, err.message);
+    if (err.message.startsWith('O Currículo Lattes')) return badRequest(res, err.message);
     console.error('Erro ao salvar equipe:', err);
     res.status(500).json({ error: 'Erro ao salvar equipe' });
   }

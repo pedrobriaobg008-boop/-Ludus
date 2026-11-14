@@ -6,7 +6,8 @@ const integranteSchema = new mongoose.Schema({
   cargo: { type: String, required: true, trim: true },
   instituicao: { type: String, required: true, trim: true },
   foto: { type: String, default: '' },
-  bio: { type: String, default: '' }
+  bio: { type: String, default: '' },
+  lattes: { type: String, default: '', trim: true }
 }, { _id: false });
 
 const secaoSchema = new mongoose.Schema({

@@ -34,6 +34,7 @@
           <div class="team-field"><label for="personInstitution">Instituição *</label><input id="personInstitution" required></div>
           <div class="team-field"><label for="personSection">Grupo da equipe *</label><select id="personSection" required></select></div>
           <div class="team-field"><label for="personBio">Biografia</label><textarea id="personBio"></textarea></div>
+          <div class="team-field"><label for="personLattes">Currículo Lattes (link)</label><input id="personLattes" type="url" inputmode="url" placeholder="https://lattes.cnpq.br/..."></div>
           <div class="team-field"><label for="personPhoto">Foto</label><input id="personPhoto" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><img id="photoPreview" class="team-photo-preview" alt="Prévia da foto" hidden><small id="currentPhoto"></small></div>
         </div>
         <div class="team-actions"><button type="submit" class="team-button team-primary" id="savePerson">Salvar integrante</button><button type="button" class="team-button team-secondary" id="cancelEdit" hidden>Cancelar edição</button></div>
@@ -67,7 +68,7 @@
   }
   function editPerson(sectionId, personId) {
     const section = sectionById(sectionId); const person = section?.integrantes.find(item => item.id === personId); if (!person) return;
-    document.getElementById('personId').value = `${sectionId}:${personId}`; document.getElementById('personName').value = person.nome || ''; document.getElementById('personRole').value = person.cargo || ''; document.getElementById('personInstitution').value = person.instituicao || ''; document.getElementById('personBio').value = person.bio || ''; document.getElementById('personSection').value = sectionId; document.getElementById('formTitle').textContent = 'Editar integrante'; document.getElementById('savePerson').textContent = 'Atualizar integrante'; document.getElementById('cancelEdit').hidden = false; document.getElementById('currentPhoto').textContent = person.foto ? 'Foto atual mantida se nenhuma nova for escolhida.' : 'Nenhuma foto cadastrada.'; const preview = document.getElementById('photoPreview'); preview.src = person.foto || ''; preview.hidden = !person.foto; photoInput.value = ''; form.scrollIntoView({behavior:'smooth',block:'start'});
+    document.getElementById('personId').value = `${sectionId}:${personId}`; document.getElementById('personName').value = person.nome || ''; document.getElementById('personRole').value = person.cargo || ''; document.getElementById('personInstitution').value = person.instituicao || ''; document.getElementById('personBio').value = person.bio || ''; document.getElementById('personLattes').value = person.lattes || ''; document.getElementById('personSection').value = sectionId; document.getElementById('formTitle').textContent = 'Editar integrante'; document.getElementById('savePerson').textContent = 'Atualizar integrante'; document.getElementById('cancelEdit').hidden = false; document.getElementById('currentPhoto').textContent = person.foto ? 'Foto atual mantida se nenhuma nova for escolhida.' : 'Nenhuma foto cadastrada.'; const preview = document.getElementById('photoPreview'); preview.src = person.foto || ''; preview.hidden = !person.foto; photoInput.value = ''; form.scrollIntoView({behavior:'smooth',block:'start'});
   }
   async function saveTeam() { const response = await fetch('/api/equipe', {method:'PUT',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(team)}); const data = await response.json().catch(()=>({})); if (!response.ok) throw new Error(data.error || 'Não foi possível salvar.'); return data; }
   async function loadTeam() {
@@ -83,7 +84,7 @@
     try {
       const file = photoInput.files[0];
       if (file) { const data = new FormData(); data.append('foto', file); const upload = await fetch('/api/equipe/foto', {method:'POST',body:data,credentials:'same-origin'}); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error || 'Falha ao enviar a foto.'); foto = uploaded.url; }
-      const updated = {id: person?.id || Date.now(), nome:document.getElementById('personName').value.trim(), cargo:document.getElementById('personRole').value.trim(), instituicao:document.getElementById('personInstitution').value.trim(), bio:document.getElementById('personBio').value.trim(), foto};
+      const updated = {id: person?.id || Date.now(), nome:document.getElementById('personName').value.trim(), cargo:document.getElementById('personRole').value.trim(), instituicao:document.getElementById('personInstitution').value.trim(), bio:document.getElementById('personBio').value.trim(), lattes:document.getElementById('personLattes').value.trim(), foto};
       if (person) sectionById(oldSectionId).integrantes = sectionById(oldSectionId).integrantes.filter(item => item.id !== Number(oldPersonId));
       sectionById(selectedSectionId).integrantes.push(updated);
       try { team = await saveTeam(); } catch (saveError) {
