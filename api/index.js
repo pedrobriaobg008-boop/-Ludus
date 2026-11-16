@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, extname, join, normalize, relative, sep } from 'path';
-import { mkdir, mkdtemp, readFile, rename, rm, stat } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { lookup } from 'dns/promises';
